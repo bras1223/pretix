@@ -694,7 +694,7 @@ msgstr ""
 
 #: pretix/base/context.py:45
 #, fuzzy, python-brace-format
-#| msgid "powered by <a %(a_attr)s>pretix</a>"
+#| msgid "powered by <a %(a_attr)s>Caught</a>"
 msgid "powered by {name} based on <a {a_attr}>pretix</a>"
 msgstr "由<a %(a_attr)s>pretix</a>提供支持"
 
@@ -12136,7 +12136,7 @@ msgstr "如果这花费的时间超过几分钟，请刷新此页面或与我们
 
 #: pretix/base/templates/pretixbase/email/email_footer.html:3
 #, python-format
-msgid "powered by <a %(a_attr)s>pretix</a>"
+msgid "powered by <a %(a_attr)s>Caught</a>"
 msgstr "由<a %(a_attr)s>pretix</a>提供支持"
 
 #: pretix/base/templates/pretixbase/email/export_failed.txt:2
