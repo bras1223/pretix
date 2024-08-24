@@ -1295,4 +1295,4 @@ class OrganizerFavicon(View):
         if icon_file:
             return redirect_to_url(get_thumbnail(icon_file, '32x32^', formats=settings.PILLOW_FORMATS_QUESTIONS_FAVICON).thumb.url)
         else:
-            return redirect_to_url(static("pretixbase/img/favicon.ico"))
+            return redirect_to_url(static("pretixbase/img/favicon-caught.ico"))

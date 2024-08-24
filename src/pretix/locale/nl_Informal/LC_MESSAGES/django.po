@@ -34996,16 +34996,14 @@ msgid ""
 "This is a self-hosted installation of <a %(a_attr)s>pretix, your free and "
 "open source ticket sales software</a>."
 msgstr ""
-"Dit is een zelfgehoste installatie van <a %(a_attr)s> pretix – jouw vrije en "
-"open-source kaartjesverkoopsoftware</a>."
+"Zelf online tickets verkopen tegen een laag tarief? Neem contact op via: <a %(a_attr)s>https://caught.nu/contact/</a>."
 
 #: pretix/presale/templates/pretixpresale/index.html:15
 msgid ""
 "If you're looking to buy a ticket, you need to follow a direct link to an "
 "event or organizer profile."
 msgstr ""
-"Als je een kaartje wilt kopen moet je een directe link volgen naar een "
-"evenement of organisatorprofiel."
+"Om een ticket te kopen volg je een directe link naar het profiel van een evenement of organisator."
 
 #: pretix/presale/templates/pretixpresale/index.html:20
 #, python-format

@@ -66,9 +66,9 @@
 
         <meta name="viewport" content="width=device-width, initial-scale=1">
         {% if development_warning or debug_warning %}
-            <link rel="shortcut icon" href="{% static "pretixbase/img/favicon-debug.ico" %}">
+            <link rel="shortcut icon" href="{% static "pretixbase/img/favicon-caught-debug.ico" %}">
         {% else %}
-            <link rel="shortcut icon" href="{% static "pretixbase/img/favicon.ico" %}">
+            <link rel="shortcut icon" href="{% static "pretixbase/img/favicon-caught.ico" %}">
             <link rel="icon" type="image/png" sizes="32x32" href="{% static "pretixbase/img/icons/favicon-32x32.png" %}">
             <link rel="icon" type="image/png" sizes="194x194" href="{% static "pretixbase/img/icons/favicon-194x194.png" %}">
             <link rel="icon" type="image/png" sizes="16x16" href="{% static "pretixbase/img/icons/favicon-16x16.png" %}">
@@ -123,7 +123,7 @@
                         </a>
                     {% endif %}
                     <a class="navbar-brand" href="{% url "control:index" %}">
-                        <img src="{% static "pretixbase/img/pretix-icon-white-mini.svg" %}" />
+                        <img src="{% static "pretixbase/img/caught-icon-white-mini.svg" %}" />
                         {{ settings.PRETIX_INSTANCE_NAME }}
                     </a>
                 </div>
