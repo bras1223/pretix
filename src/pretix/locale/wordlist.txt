@@ -9,6 +9,7 @@ acceptor
 analytics
 anonymize
 anonymized
+Auth
 authenticator
 automatical
 availabilities
@@ -123,6 +124,7 @@ redemptions
 Referer
 renderer
 renderers
+Revolut
 Sa
 Samplecity
 SAQ

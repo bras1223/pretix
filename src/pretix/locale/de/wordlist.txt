@@ -4,6 +4,7 @@ AES
 Absenderadresse
 Absenderinformation
 Absendername
+ABGEKÜNDIGT
 Admin
 Adminbereich
 Affirm
@@ -25,6 +26,7 @@ Ausgangsscans
 ausgeklappt
 ausgecheckt
 auswahl
+Auth
 Authentication
 Authenticator
 Authentifizierungsmechanismus
@@ -36,6 +38,7 @@ Bancontact
 BankID
 Banking
 barcodes
+Baskisch
 Bcc
 BCC
 Beispielevent
@@ -259,6 +262,7 @@ Requests
 Reservierungszeitraum
 reverse
 Revisionssicherheit
+Revolut
 rückabgewickelt
 Rundungsdifferenzen
 Sa
