@@ -787,7 +787,7 @@ class Renderer:
         content = o.get('content', 'dark')
         if content not in ('dark', 'white'):
             content = 'dark'
-        img = finders.find('pretixpresale/pdf/powered_by_pretix_{}.png'.format(content))
+        img = finders.find('pretixpresale/pdf/caught_logo_{}.png'.format(content))
 
         ir = ThumbnailingImageReader(img)
         try:

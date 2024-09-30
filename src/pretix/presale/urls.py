@@ -186,7 +186,7 @@ event_patterns = [
 
 organizer_patterns = [
     re_path(r'^$', pretix.presale.views.organizer.OrganizerIndex.as_view(), name='organizer.index'),
-    re_path(r'^favicon.ico/?$',
+    re_path(r'^favicon-caught.ico/?$',
             pretix.presale.views.organizer.OrganizerFavicon.as_view(),
             name='organizer.favicon'),
     re_path(r'^events/ical/$',

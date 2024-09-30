@@ -11930,8 +11930,8 @@ msgstr ""
 
 #: pretix/base/templates/pretixbase/email/email_footer.html:3
 #, python-format
-msgid "powered by <a %(a_attr)s>pretix</a>"
-msgstr "powered by <a %(a_attr)s>pretix</a>"
+msgid "powered by <a %(a_attr)s>Caught</a>"
+msgstr "powered by <a %(a_attr)s>Caught</a>"
 
 #: pretix/base/templates/pretixbase/email/export_failed.txt:2
 msgid "Your export failed."

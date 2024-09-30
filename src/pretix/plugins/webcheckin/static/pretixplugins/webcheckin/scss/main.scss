@@ -1,4 +1,4 @@
-@import "pretixbase/scss/_theme_variables.scss";
+@import "pretixbase/scss/_theme_variables_caught.scss";
 @import "pretixbase/scss/_bootstrap_vars.scss";
 @import "bootstrap/scss/_bootstrap.scss";
 @import "pretixbase/scss/_theme.scss";
@@ -6,7 +6,7 @@
 @import "datetimepicker/_bootstrap-datetimepicker.scss";
 
 body {
-  background: #FBF7FC;
+  background: #f4f9ff;
 }
 
 .container {
