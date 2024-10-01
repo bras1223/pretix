@@ -1283,13 +1283,15 @@ def _perform_order(event: Event, payment_requests: List[dict], position_ids: Lis
             subject_template = event.settings.mail_subject_order_placed
             log_entry = 'pretix.event.order.email.order_placed'
 
+            email = event.settings.mail_send_order_placed
             email_attendees = event.settings.mail_send_order_placed_attendee
             email_attendees_template = event.settings.mail_text_order_placed_attendee
             subject_attendees_template = event.settings.mail_subject_order_placed_attendee
 
         if sales_channel.identifier in event.settings.mail_sales_channel_placed_paid:
-            _order_placed_email(event, order, email_template, subject_template, log_entry, invoice, payment_objs,
-                                is_free=free_order_flow)
+            if email:
+                _order_placed_email(event, order, email_template, subject_template, log_entry, invoice, payment_objs,
+                                    is_free=free_order_flow)
             if email_attendees:
                 for p in order.positions.all():
                     if p.addon_to_id is None and p.attendee_email and p.attendee_email != order.email:

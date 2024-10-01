@@ -999,6 +999,12 @@ class MailSettingsForm(FormPlaceholderMixin, SettingsForm):
         required=True,
         choices=[]
     )
+
+    mail_send_order_placed = forms.BooleanField(
+            label=_("Send email"),
+            help_text=_('If checked, the \'Placed order\' email will be sent'),
+            required=False,
+    )
     mail_subject_order_placed = I18nFormField(
         label=_("Subject sent to order contact address"),
         required=False,

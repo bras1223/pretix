@@ -88,7 +88,7 @@
                 <h4>{% trans "Text" %}</h4>
                 <div class="panel-group" id="questions_group">
                     {% blocktrans asvar title_placed_order %}Placed order{% endblocktrans %}
-                    {% include "pretixcontrol/event/mail_settings_fragment.html" with pid="order_placed" title=title_placed_order items="mail_subject_order_placed,mail_text_order_placed,mail_send_order_placed_attendee,mail_subject_order_placed_attendee,mail_text_order_placed_attendee" exclude="mail_send_order_placed_attendee" %}
+                    {% include "pretixcontrol/event/mail_settings_fragment.html" with pid="order_placed" title=title_placed_order items="mail_send_order_placed,mail_subject_order_placed,mail_text_order_placed,mail_send_order_placed_attendee,mail_subject_order_placed_attendee,mail_text_order_placed_attendee" exclude="mail_send_order_placed,mail_send_order_placed_attendee" %}
 
                     {% blocktrans asvar title_paid_order %}Paid order{% endblocktrans %}
                     {% include "pretixcontrol/event/mail_settings_fragment.html" with pid="order_paid" title=title_paid_order items="mail_subject_order_paid,mail_text_order_paid,mail_send_order_paid_attendee,mail_subject_order_paid_attendee,mail_text_order_paid_attendee" exclude="mail_send_order_paid_attendee" %}

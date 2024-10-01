@@ -13374,6 +13374,9 @@ msgstr "bijv. uw contactgegevens"
 msgid "HTML mail renderer"
 msgstr "HTML-e-mail-renderer"
 
+msgid "If checked, the 'Placed order' email will be sent"
+msgstr "Wanneer aangevinkt wordt de 'Geplaatste bestelling' e-mail verstuurd"
+
 #: pretix/control/forms/event.py:1003 pretix/control/forms/event.py:1030
 #: pretix/control/forms/event.py:1057 pretix/control/forms/event.py:1193
 #, fuzzy

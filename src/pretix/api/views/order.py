@@ -784,13 +784,15 @@ class EventOrderViewSet(OrderViewSetMixin, viewsets.ModelViewSet):
                     email_template = request.event.settings.mail_text_order_placed
                     subject_template = request.event.settings.mail_subject_order_placed
                     log_entry = 'pretix.event.order.email.order_placed'
+                    email = request.event.settings.mail_send_order_placed
                     email_attendees = request.event.settings.mail_send_order_placed_attendee
                     email_attendees_template = request.event.settings.mail_text_order_placed_attendee
                     subject_attendees_template = request.event.settings.mail_subject_order_placed_attendee
 
-                _order_placed_email(
-                    request.event, order, email_template, subject_template,
-                    log_entry, invoice, [payment] if payment else [], is_free=free_flow
+                if (email):
+                    _order_placed_email(
+                        request.event, order, email_template, subject_template,
+                        log_entry, invoice, [payment] if payment else [], is_free=free_flow
                 )
                 if email_attendees:
                     for p in order.positions.all():

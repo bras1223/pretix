@@ -2239,6 +2239,10 @@ You can change your order details and view the status of your order at
 Best regards,  
 Your {event} team"""))  # noqa: W291
     },
+    'mail_send_order_placed': {
+            'type': bool,
+            'default': 'False'
+    },
     'mail_subject_order_placed': {
         'type': LazyI18nString,
         'default': LazyI18nString.from_gettext(gettext_noop("Your order: {code}")),
