@@ -30931,7 +30931,7 @@ msgid ""
 "Please keep your online banking account and login information available."
 msgstr ""
 "iDEAL is een online betaalmethode beschikbaar voor klanten van Nederlandse "
-"banken.  elieve uw bankgegevens bij de hand te houden."
+"banken.  Gelieve uw bankgegevens bij de hand te houden."
 
 #: pretix/plugins/stripe/payment.py:1566
 msgid "Alipay via Stripe"
