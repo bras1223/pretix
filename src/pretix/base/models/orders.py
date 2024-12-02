@@ -40,6 +40,7 @@ import json
 import logging
 import operator
 import string
+import warnings
 from collections import Counter
 from datetime import datetime, time, timedelta
 from decimal import Decimal
@@ -241,7 +242,7 @@ class Order(LockModel, LoggedModel):
     )
     email = models.EmailField(
         null=True, blank=True,
-        verbose_name=_('E-mail')
+        verbose_name=_('Email')
     )
     phone = PhoneNumberField(
         null=True, blank=True,
@@ -316,7 +317,7 @@ class Order(LockModel, LoggedModel):
     )
     email_known_to_work = models.BooleanField(
         default=False,
-        verbose_name=_('E-mail address verified')
+        verbose_name=_('Email address verified')
     )
     invoice_dirty = models.BooleanField(
         # Invoice needs to be re-issued when the order is paid again
@@ -381,8 +382,28 @@ class Order(LockModel, LoggedModel):
         self.event.cache.delete('complain_testmode_orders')
         self.delete()
 
+    def email_confirm_secret(self):
+        return self.tagged_secret("email_confirm", 9)
+
     def email_confirm_hash(self):
-        return hashlib.sha256(settings.SECRET_KEY.encode() + self.secret.encode()).hexdigest()[:9]
+        warnings.warn('Use email_confirm_secret() instead of email_confirm_hash().',
+                      DeprecationWarning)
+        return self.email_confirm_secret()
+
+    def check_email_confirm_secret(self, received_secret):
+        return (
+            hmac.compare_digest(
+                self.tagged_secret("email_confirm", 9),
+                received_secret[:9].lower()
+            ) or any(
+                # TODO: remove this clause after a while (compatibility with old secrets currently in flight)
+                hmac.compare_digest(
+                    hashlib.sha256(sk.encode() + self.secret.encode()).hexdigest()[:9],
+                    received_secret
+                )
+                for sk in [settings.SECRET_KEY, *settings.SECRET_KEY_FALLBACKS]
+            )
+        )
 
     def get_extended_status_display(self):
         # Changes in this method should to be replicated in pretixcontrol/orders/fragment_order_status.html
@@ -3183,9 +3204,9 @@ class InvoiceAddress(models.Model):
     company = models.CharField(max_length=255, blank=True, verbose_name=_('Company name'))
     name_cached = models.CharField(max_length=255, verbose_name=_('Full name'), blank=True)
     name_parts = models.JSONField(default=dict)
-    street = models.TextField(verbose_name=_('Address'), blank=False)
-    zipcode = models.CharField(max_length=30, verbose_name=_('ZIP code'), blank=False)
-    city = models.CharField(max_length=255, verbose_name=_('City'), blank=False)
+    street = models.TextField(verbose_name=_('Address'), blank=True)
+    zipcode = models.CharField(max_length=30, verbose_name=_('ZIP code'), blank=True)
+    city = models.CharField(max_length=255, verbose_name=_('City'), blank=True)
     country_old = models.CharField(max_length=255, verbose_name=_('Country'), blank=False)
     country = FastCountryField(verbose_name=_('Country'), blank=False, blank_label=_('Select country'),
                                countries=CachedCountries)
@@ -3368,6 +3389,74 @@ class BlockedTicketSecret(models.Model):
 
     class Meta:
         unique_together = (('event', 'secret'),)
+
+
+class PrintLog(models.Model):
+    """
+    A print log object is created when a ticket or badge is printed with our apps.
+    """
+    TYPE_BADGE = 'badge'
+    TYPE_TICKET = 'ticket'
+    TYPE_CERTIFICATE = 'certificate'
+    TYPE_OTHER = 'other'
+    PRINT_TYPES = (
+        (TYPE_BADGE, _('Badge')),
+        (TYPE_TICKET, _('Ticket')),
+        (TYPE_CERTIFICATE, _('Certificate')),
+        (TYPE_OTHER, _('Other')),
+    )
+
+    position = models.ForeignKey(
+        'pretixbase.OrderPosition',
+        related_name='print_logs',
+        on_delete=models.CASCADE,
+    )
+    successful = models.BooleanField(
+        default=True,
+    )
+
+    # Datetime of checkin, might be different from created if past scans are uploaded
+    datetime = models.DateTimeField(default=now)
+
+    # Datetime of creation on server
+    created = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
+    # Who printed?
+    device = models.ForeignKey('Device', related_name='print_logs', null=True, blank=True, on_delete=models.PROTECT)
+    user = models.ForeignKey('User', related_name='print_logs', null=True, blank=True, on_delete=models.PROTECT)
+    api_token = models.ForeignKey('TeamAPIToken', null=True, blank=True, on_delete=models.PROTECT)
+    oauth_application = models.ForeignKey('pretixapi.OAuthApplication', null=True, blank=True, on_delete=models.PROTECT)
+
+    # Source = Tag field with undefined values, e.g. name of app ("pretixscan")
+    source = models.CharField(max_length=255)
+
+    # Type = Type of object printed ("badge", "ticket")
+    type = models.CharField(max_length=255, choices=PRINT_TYPES)
+
+    info = models.JSONField(default=dict)
+
+    objects = ScopedManager(organizer='position__order__event__organizer')
+
+    class Meta:
+        ordering = (('-datetime'),)
+
+    def __repr__(self):
+        return "<PrintLog: pos {} at {} from {}>".format(
+            self.position, self.datetime, self.source
+        )
+
+    def save(self, **kwargs):
+        super().save(**kwargs)
+        if self.position:
+            self.position.order.touch()
+
+    def delete(self, **kwargs):
+        super().delete(**kwargs)
+        self.position.order.touch()
+
+    @property
+    def is_late_upload(self):
+        return self.created and abs(self.created - self.datetime) > timedelta(minutes=2)
 
 
 @receiver(post_delete, sender=CachedTicket)
