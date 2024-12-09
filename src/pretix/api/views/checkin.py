@@ -685,7 +685,7 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
     require_attention = op.require_checkin_attention or any(
         addon.item.checkin_attention for addon in op.addons.all()
     )
-    print(checkin_texts)
+
     common_checkin_args['list'] = list_by_event[op.order.event_id]
 
     # 5. Pre-validate all incoming answers, handle file upload
