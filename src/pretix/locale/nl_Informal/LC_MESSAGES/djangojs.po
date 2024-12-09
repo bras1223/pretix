@@ -966,6 +966,10 @@ msgctxt "widget"
 msgid "Redeem a voucher"
 msgstr "Verzilver een voucher"
 
+#: pretix/static/pretixpresale/js/widget/widget.js:51
+msgid "Redeem another voucher"
+msgstr "Verzilver nog een voucher"
+
 #: pretix/static/pretixpresale/js/widget/widget.js:52
 msgctxt "widget"
 msgid "Redeem"

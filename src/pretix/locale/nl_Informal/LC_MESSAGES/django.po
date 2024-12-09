@@ -33947,6 +33947,9 @@ msgstr "Leeg winkelwagen"
 msgid "Redeem a voucher"
 msgstr "Verzilver een voucher"
 
+msgid "Redeem another voucher"
+msgstr "Verzilver nog een voucher"
+
 #: pretix/presale/templates/pretixpresale/event/fragment_cart_box.html:48
 msgid "We're applying this voucher to your cart..."
 msgstr "We passen de voucher op je winkelwagen toe…"
