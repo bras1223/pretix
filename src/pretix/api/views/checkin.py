@@ -677,6 +677,15 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
             op_candidates = op_candidates_matching_product
 
     op = op_candidates[0]
+
+    checkin_texts = op.checkin_texts
+    for addon in op.addons.all():
+        checkin_texts.extend([addon.item.checkin_text])
+
+    require_attention = op.require_checkin_attention or any(
+        addon.item.checkin_attention for addon in op.addons.all()
+    )
+    print(checkin_texts)
     common_checkin_args['list'] = list_by_event[op.order.event_id]
 
     # 5. Pre-validate all incoming answers, handle file upload
@@ -717,8 +726,8 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
         except RequiredQuestionsError as e:
             return Response({
                 'status': 'incomplete',
-                'require_attention': op.require_checkin_attention,
-                'checkin_texts': op.checkin_texts,
+                'require_attention': require_attention,
+                'checkin_texts': checkin_texts,
                 'position': CheckinListOrderPositionSerializer(op, context=_make_context(context, op.order.event)).data,
                 'questions': [
                     QuestionSerializer(q).data for q in e.questions
@@ -748,16 +757,16 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
                 'status': 'error',
                 'reason': e.code,
                 'reason_explanation': e.reason,
-                'require_attention': op.require_checkin_attention,
-                'checkin_texts': op.checkin_texts,
+                'require_attention': require_attention,
+                'checkin_texts': checkin_texts,
                 'position': CheckinListOrderPositionSerializer(op, context=_make_context(context, op.order.event)).data,
                 'list': MiniCheckinListSerializer(list_by_event[op.order.event_id]).data,
             }, status=400)
         else:
             return Response({
                 'status': 'ok',
-                'require_attention': op.require_checkin_attention,
-                'checkin_texts': op.checkin_texts,
+                'require_attention': require_attention,
+                'checkin_texts': checkin_texts,
                 'position': CheckinListOrderPositionSerializer(op, context=_make_context(context, op.order.event)).data,
                 'list': MiniCheckinListSerializer(list_by_event[op.order.event_id]).data,
             }, status=201)
