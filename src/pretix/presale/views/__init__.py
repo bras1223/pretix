@@ -251,6 +251,7 @@ class CartMixin:
             'seconds_left': seconds_left,
             'first_expiry': first_expiry,
             'is_ordered': bool(order),
+            'combi': bool(positions and str(positions[0].item) == 'Combideal'),
             'itemcount': sum(c.count for c in positions if not c.addon_to)
         }
 
