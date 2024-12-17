@@ -287,7 +287,7 @@ def _logic_explain(rules, ev, rule_data, now_dt=None):
         elif var == 'gate':
             var_weights[vname] = (500, 0)
             var_texts[vname] = _('Wrong entrance gate')
-        elif var in ('entries_number', 'entries_today', 'entries_days', 'minutes_since_last_entry', 'minutes_since_first_entry', 'now_isoweekday') \
+        elif var in ('entries_number', 'entries_number_all_lists', 'entries_today', 'entries_days', 'minutes_since_last_entry', 'minutes_since_first_entry', 'now_isoweekday') \
                 or (isinstance(var, dict) and any(t in var for t in ("entries_since", "entries_before", "entries_days_since", "entries_days_before"))):
             w = {
                 'minutes_since_first_entry': 80,
@@ -298,6 +298,7 @@ def _logic_explain(rules, ev, rule_data, now_dt=None):
                 'entries_since': 110,
                 'entries_before': 110,
                 'entries_number': 120,
+                'entries_number_all_lists': 120,
                 'entries_today': 140,
                 'now_isoweekday': 210,
             }
@@ -314,6 +315,7 @@ def _logic_explain(rules, ev, rule_data, now_dt=None):
                 'minutes_since_first_entry': _('time since first entry'),
                 'entries_days': _('number of days with an entry'),
                 'entries_number': _('number of entries'),
+                'entries_number_all_lists': _('aantal scans'),
                 'entries_today': _('number of entries today'),
                 'entries_since': _('number of entries since {datetime}'),
                 'entries_before': _('number of entries before {datetime}'),
@@ -464,7 +466,9 @@ class LazyRuleVars:
     @cached_property
     def entries_number(self):
         return self._position.checkins.filter(type=Checkin.TYPE_ENTRY, list=self._clist).count()
-
+    @cached_property
+    def entries_number_all_lists(self):
+        return self._position.checkins.filter(type=Checkin.TYPE_ENTRY).count()
     @cached_property
     def entries_today(self):
         tz = self._clist.event.timezone
@@ -722,6 +726,19 @@ class SQLLogic:
                     Value(0),
                     output_field=IntegerField()
                 )
+            elif values[0] == 'entries_number_all_lists':
+                            return Coalesce(
+                                Subquery(
+                                    Checkin.objects.filter(
+                                        position_id=OuterRef('pk'),
+                                        type=Checkin.TYPE_ENTRY,
+                                    ).values('position_id').order_by().annotate(
+                                        c=Count('*')
+                                    ).values('c')
+                                ),
+                                Value(0),
+                                output_field=IntegerField()
+                            )
             elif values[0] == 'entries_today':
                 midnight = now().astimezone(self.list.event.timezone).replace(hour=0, minute=0, second=0, microsecond=0)
                 return Coalesce(

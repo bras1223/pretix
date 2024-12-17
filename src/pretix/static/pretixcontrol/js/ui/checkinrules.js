@@ -123,6 +123,10 @@ $(function () {
       'label': gettext('Number of previous entries'),
       'type': 'int',
     },
+    'entries_number_all_lists': {
+      'label': gettext('Number of previous entries - all lists'),
+      'type': 'int',
+    },
     'entries_today': {
       'label': gettext('Number of previous entries since midnight'),
       'type': 'int',

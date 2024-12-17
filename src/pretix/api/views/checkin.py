@@ -301,7 +301,6 @@ with scopes_disabled():
                 blocked__isnull=True,
             )
 
-
 def _handle_file_upload(data, user, auth):
     try:
         cf = CachedFile.objects.get(

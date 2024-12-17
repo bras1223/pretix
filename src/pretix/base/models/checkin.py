@@ -279,7 +279,7 @@ class CheckinList(LoggedModel):
             'entries_days_before',
         }
         allowed_vars = {
-            'product', 'variation', 'now', 'now_isoweekday', 'entries_number', 'entries_today', 'entries_days',
+            'product', 'variation', 'now', 'now_isoweekday', 'entries_number','entries_number_all_lists', 'entries_today', 'entries_days',
             'minutes_since_last_entry', 'minutes_since_first_entry', 'gate', 'entry_status',
         }
         if not rules or not isinstance(rules, dict):

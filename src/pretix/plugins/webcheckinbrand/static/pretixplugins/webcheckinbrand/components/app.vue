@@ -27,6 +27,7 @@
         <div :class="'check-result-status check-result-' + checkResultColor">
           <div class="check-result-text">{{ checkResultText }}</div>
           <div class="check-result-item">{{ checkResultItemvar }}</div>
+          <div class="check-result-item">Aantal keer ingewisseld: {{ checkResultAmount }}</div>
           <div class="check-result-reason" v-if="checkResult.reason_explanation">{{ checkResult.reason_explanation }}</div>
 
         </div>
@@ -83,36 +84,11 @@
         <div class="panel panel-default">
           <div class="panel-body meta">
             <div class="row settings">
-              <div class="col-sm-6">
-                <div>
-                  <span :class="'fa fa-sign-' + (type === 'exit' ? 'out' : 'in')"></span>
-                  {{ $root.strings['scantype.' + type] }}<br>
-                  <button @click="switchType" class="btn btn-default"><span class="fa fa-refresh"></span> {{ $root.strings['scantype.switch'] }}</button>
-                </div>
-              </div>
-              <div class="col-sm-6">
+              <div class="col-sm-12">
                 <div v-if="checkinlist">
                   {{ checkinlist.name }}<br>
                   {{ subevent }}<br v-if="subevent">
-                  <button @click="switchList" type="button" class="btn btn-default">{{ $root.strings['checkinlist.switch'] }}</button>
                 </div>
-              </div>
-            </div>
-            <div v-if="status" class="row status">
-              <div class="col-sm-4">
-                <span class="statistic">{{ status.checkin_count }}</span>
-                {{ $root.strings['status.checkin'] }}
-              </div>
-              <div class="col-sm-4">
-                <span class="statistic">{{ status.position_count }}</span>
-                {{ $root.strings['status.position'] }}
-              </div>
-              <div class="col-sm-4">
-                <div class="pull-right">
-                  <button @click="fetchStatus" class="btn btn-default"><span :class="'fa fa-refresh' + (statusLoading ? ' fa-spin': '')"></span></button>
-                </div>
-                <span class="statistic">{{ status.inside_count }}</span>
-                {{ $root.strings['status.inside'] }}
               </div>
             </div>
           </div>
@@ -295,6 +271,11 @@ export default {
       } else {
         return this.checkResult.reason
       }
+    },
+    checkResultAmount() {
+      if (!this.checkResult) return ''
+      console.log(this.checkResult.position)
+      return this.checkResult.position.checkins.length;
     },
     checkResultColor () {
       if (!this.checkResult) return ''
@@ -485,8 +466,9 @@ export default {
       this.searchResults = []
       this.answers = {}
 
+      console.log(this.query)
       window.clearInterval(this.clearTimeout)
-      fetch(this.$root.api.lists + this.checkinlist.id + '/positions/?ignore_status=true&expand=subevent&expand=item&expand=variation&check_rules=true&search=' + encodeURIComponent(this.query))
+      fetch(this.$root.api.lists + this.checkinlist.id + '/positions/?ignore_status=true&expand=subevent&expand=item&expand=variation&check_rules=true&brand=true&search=' + encodeURIComponent(this.query))
           .then(response => {
             if (!response.ok && [401, 403].includes(response.status)) {
               window.location.href = '/control/login?next=' + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);

@@ -484,15 +484,13 @@ msgstr "Aantal eerdere binnenkomsten sinds middernacht"
 
 #: pretix/static/pretixcontrol/js/ui/checkinrules.js:131
 #, fuzzy
-#| msgid "Number of previous entries"
 msgid "Number of previous entries since"
-msgstr "Aantal eerdere binnenkomsten"
+msgstr "Aantal eerdere binnenkomsten na"
 
 #: pretix/static/pretixcontrol/js/ui/checkinrules.js:135
 #, fuzzy
-#| msgid "Number of previous entries"
 msgid "Number of previous entries before"
-msgstr "Aantal eerdere binnenkomsten"
+msgstr "Aantal eerdere binnenkomsten voor"
 
 #: pretix/static/pretixcontrol/js/ui/checkinrules.js:139
 msgid "Number of days with a previous entry"

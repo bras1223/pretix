@@ -12,6 +12,8 @@ recursive-include src/pretix/control/templates *
 recursive-include src/pretix/presale/templates *
 recursive-include src/pretix/plugins/autocheckin/templates *
 recursive-include src/pretix/plugins/autocheckin/static *
+recursive-include src/pretix/plugins/autocheckin-brand/templates *
+recursive-include src/pretix/plugins/autocheckin-brand/static *
 recursive-include src/pretix/plugins/banktransfer/templates *
 recursive-include src/pretix/plugins/banktransfer/static *
 recursive-include src/pretix/plugins/manualpayment/templates *

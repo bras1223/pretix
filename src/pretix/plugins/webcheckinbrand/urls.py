@@ -19,4 +19,11 @@
 # You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 # <https://www.gnu.org/licenses/>.
 #
-__version__ = "2024.12.0.dev8"
+from django.urls import re_path
+
+from .views import IndexView
+
+urlpatterns = [
+    re_path(r'^control/event/(?P<organizer>[^/]+)/(?P<event>[^/]+)/webcheckin-brand/$',
+            IndexView.as_view(), name='index'),
+]

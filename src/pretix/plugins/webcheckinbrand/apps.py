@@ -19,4 +19,23 @@
 # You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 # <https://www.gnu.org/licenses/>.
 #
-__version__ = "2024.12.0.dev8"
+from django.apps import AppConfig
+from django.utils.translation import gettext_lazy as _
+
+from pretix import __version__ as version
+
+
+class WebCheckinBrandApp(AppConfig):
+    name = 'pretix.plugins.webcheckinbrand'
+    verbose_name = _("Web-based check-in - Brandslang")
+
+    class PretixPluginMeta:
+        name = _("Web-based check-in - Brandslang")
+        author = _("the pretix team")
+        version = version
+        experimental = True
+        category = "FEATURE"
+        description = _("Turn your browser into a check-in device to perform access control.")
+
+    def ready(self):
+        from . import signals  # NOQA
