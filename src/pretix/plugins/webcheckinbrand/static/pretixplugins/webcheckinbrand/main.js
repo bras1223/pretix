@@ -31,7 +31,7 @@ window.vapp = new Vue({
             'checkinlist.none': gettext('No active check-in lists found.'),
             'checkinlist.switch': gettext('Switch check-in list'),
             'results.headline': gettext('Search results'),
-            'results.none': gettext('No tickets found'),
+            'results.none': gettext('Geen kaarten gevonden'),
             'check.headline': gettext('Result'),
             'check.attention': gettext('This ticket requires special attention'),
             'scantype.switch': gettext('Switch direction'),

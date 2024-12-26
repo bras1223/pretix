@@ -3,7 +3,7 @@
     <div class="details">
       <h4>{{ position.order }}-{{ position.positionid }} {{ position.attendee_name }}</h4>
       <span>{{ itemvar }}<br></span>
-      <span v-if="subevent">{{ subevent }}<br></span>
+      <span v-if="subevent">{{ subevent }} · {{position.checkins.length ? position.checkins.length : 0}} keer ingewisseld<br></span>
       <div class="secret">{{ position.secret }}</div>
     </div>
     <div :class="`status status-${status}`">
@@ -35,7 +35,7 @@ export default {
       if (!this.position.subevent) return ''
       const name = i18nstring_localize(this.position.subevent.name)
       const date = moment.utc(this.position.subevent.date_from).tz(this.$root.timezone).format(this.$root.datetime_format)
-      return `${name} · ${date}`
+      return `${name}`
     },
   },
 }
