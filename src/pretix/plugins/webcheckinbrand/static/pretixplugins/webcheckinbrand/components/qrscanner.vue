@@ -1,6 +1,6 @@
 <template>
   <div id="qr-scanner">
-    <div id="reader" style="width: 100%; height: 400px"></div>
+    <div id="reader" style="width: 100%"></div>
   </div>
 </template>
 
