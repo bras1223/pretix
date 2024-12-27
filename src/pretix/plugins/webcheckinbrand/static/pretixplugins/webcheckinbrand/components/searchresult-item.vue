@@ -2,8 +2,8 @@
   <a class="list-group-item searchresult" href="#" @click.prevent="$emit('selected', position)" ref="a">
     <div class="details">
       <h4>{{ position.order }}-{{ position.positionid }} {{ position.attendee_name }}</h4>
-      <span>{{ itemvar }}<br></span>
-      <span v-if="subevent">{{ subevent }} · {{position.checkins.length ? position.checkins.length : 0}} keer ingewisseld<br></span>
+      <span>{{ itemvar }} · {{position.checkins.length ? position.checkins.length : 0}} keer ingewisseld<br></span>
+      <span v-if="subevent">{{ subevent }}<br></span>
       <div class="secret">{{ position.secret }}</div>
     </div>
     <div :class="`status status-${status}`">
