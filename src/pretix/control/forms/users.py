@@ -67,6 +67,8 @@ class UserEditForm(forms.ModelForm):
             'locale',
             'timezone',
             'email',
+            'auth_token',
+            'checkinlist_id',
             'require_2fa',
             'is_active',
             'is_staff',

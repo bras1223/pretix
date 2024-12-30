@@ -32637,8 +32637,8 @@ msgstr "Aantal keer gebruikt:"
 #, python-format
 msgid "This ticket has been used once."
 msgid_plural "This ticket has been used %(count)s times."
-msgstr[0] "Dit ticket werd reeds eenmaal gebruikt."
-msgstr[1] "Dit ticket werd al %(count)s keer gebruikt."
+msgstr[0] "Deze kaart werd reeds eenmaal gebruikt."
+msgstr[1] "Deze kaart werd al %(count)s keer gebruikt."
 
 #: pretix/presale/templates/pretixpresale/event/fragment_cart.html:170
 msgid "No attendee name provided"

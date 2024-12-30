@@ -224,6 +224,7 @@ class QuestionForm(I18nModelForm):
             'ask_during_checkin',
             'show_during_checkin',
             'hidden',
+            'unique',
             'identifier',
             'items',
             'dependency_question',

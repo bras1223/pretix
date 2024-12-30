@@ -17,6 +17,8 @@
         <fieldset>
             <legend>{% trans "Log-in settings" %}</legend>
             {% bootstrap_field form.email layout='control' %}
+            {% bootstrap_field form.auth_token layout='control' %}
+            {% bootstrap_field form.checkinlist_id layout='control' %}
             {% bootstrap_field form.new_pw layout='control' %}
             {% bootstrap_field form.new_pw_repeat layout='control' %}
             {% bootstrap_field form.needs_password_change layout='control' %}

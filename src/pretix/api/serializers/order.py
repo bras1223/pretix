@@ -584,7 +584,6 @@ class AttendeeNamePartsField(serializers.Field):
                 pass
         return p
 
-
 class CheckinListOrderPositionSerializer(OrderPositionSerializer):
     require_attention = RequireAttentionField(source='*')
     attendee_name = AttendeeNameField(source='*')

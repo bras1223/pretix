@@ -46,6 +46,7 @@ from rest_framework.fields import DateTimeField
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
+from rest_framework import serializers
 
 from pretix.api.serializers.checkin import (
     CheckinListSerializer, CheckinRPCRedeemInputSerializer,
@@ -53,7 +54,7 @@ from pretix.api.serializers.checkin import (
 )
 from pretix.api.serializers.item import QuestionSerializer
 from pretix.api.serializers.order import (
-    CheckinListOrderPositionSerializer, FailedCheckinSerializer,
+    CheckinListOrderPositionSerializer, FailedCheckinSerializer
 )
 from pretix.api.views import RichOrderingFilter
 from pretix.api.views.order import OrderPositionFilter
@@ -415,12 +416,26 @@ def _checkin_list_position_queryset(checkinlists, ignore_status=False, ignore_pr
 
     return qs
 
+def get_total_checkins(all_checkinlists, op_candidates, checkin_type):
+    return Checkin.objects.filter(
+        list__in=all_checkinlists,
+        position__in=[op.pk for op in op_candidates],
+        type=checkin_type
+    ).count()
 
 def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force, checkin_type, ignore_unpaid, nonce,
                     untrusted_input, user, auth, expand, pdf_data, request, questions_supported, canceled_supported,
                     source_type='barcode', legacy_url_support=False, simulate=False, gate=None):
     if not checkinlists:
         raise ValidationError('No check-in list passed.')
+
+    if hasattr(user, 'checkinlist_id'):
+            user_checkinlist_id = int(user.checkinlist_id)
+            checkinlist_ids = [cl.pk for cl in checkinlists]
+            print(user_checkinlist_id)
+            print(checkinlist_ids)
+            if user_checkinlist_id not in checkinlist_ids:
+                raise ValidationError('User does not have permission for the provided check-in list.')
 
     list_by_event = {cl.event_id: cl for cl in checkinlists}
     prefetch_related_objects([cl for cl in checkinlists if not cl.all_products], 'limit_products')
@@ -700,6 +715,7 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
                 except (ValidationError, BaseValidationError):
                     pass
 
+    all_checkinlists = CheckinList.objects.filter(event_id__in=list_by_event)
     # 6. Pass to our actual check-in logic
     with language(op.order.event.settings.locale):
         try:
@@ -760,6 +776,7 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
                 'checkin_texts': checkin_texts,
                 'position': CheckinListOrderPositionSerializer(op, context=_make_context(context, op.order.event)).data,
                 'list': MiniCheckinListSerializer(list_by_event[op.order.event_id]).data,
+                'total_checkins': get_total_checkins(all_checkinlists, op_candidates, checkin_type),
             }, status=400)
         else:
             return Response({
@@ -768,6 +785,7 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
                 'checkin_texts': checkin_texts,
                 'position': CheckinListOrderPositionSerializer(op, context=_make_context(context, op.order.event)).data,
                 'list': MiniCheckinListSerializer(list_by_event[op.order.event_id]).data,
+                'total_checkins': get_total_checkins(all_checkinlists, op_candidates, checkin_type),
             }, status=201)
 
 
@@ -781,9 +799,20 @@ class ExtendedBackend(DjangoFilterBackend):
 
         return kwargs
 
+class CheckinListOrderPositionWithTotalSerializer(CheckinListOrderPositionSerializer):
+    total_checkins = serializers.SerializerMethodField()
+
+    def get_total_checkins(self, obj):
+        # Calculate total check-ins for the position
+        request = self.context.get('request')
+        all_checkinlists = CheckinList.objects.filter(event=request.event)
+        return get_total_checkins(all_checkinlists, [obj], Checkin.TYPE_ENTRY)
+
+    class Meta(CheckinListOrderPositionSerializer.Meta):
+        fields = tuple(list(CheckinListOrderPositionSerializer.Meta.fields) + ['total_checkins'])
 
 class CheckinListPositionViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = CheckinListOrderPositionSerializer
+    serializer_class = CheckinListOrderPositionWithTotalSerializer
     queryset = OrderPosition.all.none()
     filter_backends = (ExtendedBackend, RichOrderingFilter)
     ordering = (F('attendee_name_cached').asc(nulls_last=True), 'pk')
@@ -833,6 +862,9 @@ class CheckinListPositionViewSet(viewsets.ReadOnlyModelViewSet):
             raise Http404()
 
     def get_queryset(self, ignore_status=False, ignore_products=False):
+        brand = self.request.query_params.get('brand', 'false').lower() in ('true', '1')
+        search_query = self.request.query_params.get('search', '')
+
         qs = _checkin_list_position_queryset(
             [self.checkinlist],
             ignore_status=self.request.query_params.get('ignore_status', 'false') == 'true' or ignore_status,
@@ -842,8 +874,14 @@ class CheckinListPositionViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         if 'pk' not in self.request.resolver_match.kwargs and 'can_view_orders' not in self.request.eventpermset \
-                and len(self.request.query_params.get('search', '')) < 3:
+                and len(search_query) < 3:
             qs = qs.none()
+
+        if brand and search_query:
+                # Apply brand-specific filtering
+                qs = qs.filter(
+                    Q(order__code=search_query) | Q(order__secret=search_query)
+                )
 
         return qs
 

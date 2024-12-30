@@ -272,6 +272,9 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
     auth_backend = models.CharField(max_length=255, default='native')
     auth_backend_identifier = models.CharField(max_length=190, db_index=True, null=True, blank=True)
     session_token = models.CharField(max_length=32, default=generate_session_token)
+    auth_token = models.CharField(max_length=255, unique=True, null=True, blank=True, verbose_name=_('Auth token'))
+    checkinlist_id = models.CharField(max_length=255, null=True, blank=True, verbose_name=_('Checkin-list ID'))
+
 
     objects = UserManager()
 

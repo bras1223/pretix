@@ -162,7 +162,6 @@ def login(request):
     )[::-1]
     return render(request, 'pretixcontrol/auth/login.html', ctx)
 
-
 @csrf_exempt
 @require_http_methods(["POST"])
 def bad_origin_report(request):

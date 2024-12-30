@@ -2,7 +2,7 @@
   <a class="list-group-item searchresult" href="#" @click.prevent="$emit('selected', position)" ref="a">
     <div class="details">
       <h4>{{ position.order }}-{{ position.positionid }} {{ position.attendee_name }}</h4>
-      <span>{{ itemvar }} · {{position.checkins.length ? position.checkins.length : 0}} keer ingewisseld<br></span>
+      <span>{{ itemvar }} · {{position.total_checkins ? position.total_checkins : 0}} keer ingewisseld<br></span>
       <span v-if="subevent">{{ subevent }}<br></span>
       <div class="secret">{{ position.secret }}</div>
     </div>
@@ -20,6 +20,7 @@ export default {
   },
   computed: {
     status() {
+      console.log(this.position)
       if (this.position.checkins.length) return 'redeemed';
       if (this.position.order__status === 'n' && this.position.order__valid_if_pending) return 'pending_valid';
       if (this.position.order__status === 'n' && this.position.order__require_approval) return 'require_approval';

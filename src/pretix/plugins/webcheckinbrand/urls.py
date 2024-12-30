@@ -20,10 +20,29 @@
 # <https://www.gnu.org/licenses/>.
 #
 from django.urls import re_path
+from pretix.base.models import User
+from django.contrib.auth import (
+    authenticate, login as auth_login, logout as auth_logout,
+)
+from django.shortcuts import redirect, render
+from django.http import HttpResponse
 
 from .views import IndexView
+def token_login_redirect(request, token):
+    try:
+        if not token:
+            return HttpResponse(json.dumps({"error": "Token is required."}), status=400, content_type="application/json")
+
+        user = User.objects.get(auth_token=token)
+        auth_login(request, user)
+        return redirect(f'/control/event/weerter-brandslang/digitaal/webcheckin-brand/#{user.checkinlist_id}')
+    except User.DoesNotExist:
+        return HttpResponse("Invalid token.", status=401)
+
 
 urlpatterns = [
+    re_path(r'^brand/(?P<token>[a-zA-Z0-9\-]+)/$',
+            token_login_redirect, name='index'),
     re_path(r'^control/event/(?P<organizer>[^/]+)/(?P<event>[^/]+)/webcheckin-brand/$',
             IndexView.as_view(), name='index'),
 ]

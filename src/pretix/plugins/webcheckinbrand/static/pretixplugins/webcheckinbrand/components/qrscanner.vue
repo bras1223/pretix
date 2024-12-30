@@ -20,7 +20,7 @@ export default {
         return;
       }
 
-      const config = { fps: 10, qrbox: 250 };
+      const config = { fps: 10, qrbox : { width: 250, height: 250 }, aspectRatio: 1.777778};
       this.qrCodeScanner = new window.Html5Qrcode("reader");
 
       this.qrCodeScanner.start(
