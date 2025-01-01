@@ -2,10 +2,9 @@
   <div id="app">
     <div class="container">
       <h1>
-        {{ $root.event_name }}
+        {{$root.event_name}}
       </h1>
       <qrscanner v-if="checkinlist" @qr-scanned="handleQRScan"></qrscanner>
-      <checkinlist-select v-if="!checkinlist" @selected="selectList($event)"></checkinlist-select>
 
       <input v-if="checkinlist" v-model="query" ref="input" :placeholder="$root.strings['input.placeholder']" @keyup="inputKeyup" class="form-control scan-input">
 
@@ -220,6 +219,23 @@ export default {
     }
   },
   mounted() {
+    const list = location.hash;
+    history.replaceState(null, null, ' ');
+    if (list) {
+      fetch(this.$root.api.lists + list.substr(1) + '/' + '?expand=subevent')
+          .then(response => response.json())
+          .then(data => {
+            this.loading = false
+            if (data.id) {
+              this.selectList(data)
+            }
+          })
+          .catch(reason => {
+            console.log(reason)
+          })
+      return
+    }
+    // Handle URL token-based login
     window.addEventListener('focus', this.globalKeydown)
     document.addEventListener("visibilitychange", this.globalKeydown)
     document.addEventListener('keydown', this.globalKeydown)
@@ -274,11 +290,7 @@ export default {
     },
     checkResultAmount() {
       if (!this.checkResult) return ''
-      let amount = this.checkResult.position.checkins.length
-      if (this.checkResult.status === 'ok') {
-        amount += 1;
-      }
-      return amount;
+      return this.checkResult.total_checkins;
     },
     checkResultColor () {
       if (!this.checkResult) return ''
@@ -469,9 +481,8 @@ export default {
       this.searchResults = []
       this.answers = {}
 
-      console.log(this.query)
       window.clearInterval(this.clearTimeout)
-      fetch(this.$root.api.lists + this.checkinlist.id + '/positions/?ignore_status=true&expand=subevent&expand=item&expand=variation&check_rules=true&search=' + encodeURIComponent(this.query))
+      fetch(this.$root.api.lists + this.checkinlist.id + '/positions/?ignore_status=true&expand=subevent&expand=item&expand=variation&check_rules=true&brand=true&search=' + encodeURIComponent(this.query))
           .then(response => {
             if (!response.ok && [401, 403].includes(response.status)) {
               window.location.href = '/control/login?next=' + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
@@ -554,8 +565,7 @@ export default {
               })
     },
     selectList(list) {
-      this.checkinlist = list
-      location.hash = '#' + list.id
+      this.checkinlist = list;
       this.refocus()
       this.fetchStatus()
     },
