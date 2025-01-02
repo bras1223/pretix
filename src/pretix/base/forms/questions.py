@@ -986,6 +986,20 @@ class BaseQuestionsForm(forms.Form):
                 if question_is_required(q) and not answer and answer != 0 and not field.errors:
                     raise ValidationError({'question_%d' % q.pk: [_('This field is required.')]})
 
+     # Validate unique questions
+        unique_answers = {}
+        for q in question_cache.values():
+            if getattr(q, 'unique', False):
+                answer = d.get('question_%d' % q.pk)
+                print(answer)
+                normalized_answer = str(answer).strip().lower() if answer else None
+
+                if normalized_answer in unique_answers:
+                    print("not unique")
+                    raise ValidationError({'question_%d' % q.pk: [_('Dit antwoord moet uniek zijn.')]})
+                if normalized_answer:
+                            unique_answers[normalized_answer] = True
+
         # Strip invisible question from cleaned_data so they don't end up in the database
         for q in question_cache.values():
             answer = d.get('question_%d' % q.pk)
