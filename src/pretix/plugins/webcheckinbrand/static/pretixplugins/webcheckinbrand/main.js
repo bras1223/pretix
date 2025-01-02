@@ -37,7 +37,7 @@ window.vapp = new Vue({
             'scantype.switch': gettext('Switch direction'),
             'scantype.entry': gettext('Entry'),
             'scantype.exit': gettext('Exit'),
-            'input.placeholder': gettext('Scan a ticket or search and press return…'),
+            'input.placeholder': gettext('Scan een kaart of zoek een bestelling…'),
             'pagination.next': gettext('Load more'),
             'status.p': gettext('Valid'),
             'status.n': gettext('Unpaid'),
