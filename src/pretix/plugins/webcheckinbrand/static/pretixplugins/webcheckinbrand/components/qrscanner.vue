@@ -31,7 +31,9 @@ export default {
       }
 
       const config = { fps: 10, qrbox: qrboxFunction, videoConstraints: {
-          aspectRatio: 1.777778,
+          aspectRatio: 1.0,  facingMode: {
+            exact: "environment"
+          }
         }, showTorchButtonIfSupported: true};
       this.qrCodeScanner = new window.Html5Qrcode("reader");
 
