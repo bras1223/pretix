@@ -1,9 +1,9 @@
 <template>
   <div id="app">
     <div class="container">
-      <h1>
-        {{$root.event_name}}
-      </h1>
+      <div class="header-logo" v-if="logo">
+        <img :src="logo" alt="Brand Logo">
+      </div>
       <qrscanner v-if="checkinlist" @qr-scanned="handleQRScan"></qrscanner>
 
       <input v-if="checkinlist" v-model="query" ref="input" :placeholder="$root.strings['input.placeholder']" @keyup="inputKeyup" class="form-control scan-input">
@@ -212,6 +212,7 @@ export default {
       checkError: null,
       checkResult: null,
       checkinlist: null,
+      logo: null,
       clearTimeout: null,
       showUnpaidModal: false,
       showQuestionsModal: false,
@@ -220,7 +221,6 @@ export default {
   },
   mounted() {
     const list = location.hash;
-    history.replaceState(null, null, ' ');
     if (list) {
       fetch(this.$root.api.lists + list.substr(1) + '/' + '?expand=subevent')
           .then(response => response.json())
@@ -548,10 +548,6 @@ export default {
       this.type = this.type === 'exit' ? 'entry' : 'exit'
       this.refocus()
     },
-    switchList() {
-      location.hash = ''
-      this.checkinlist = null
-    },
     fetchStatus() {
       this.statusLoading++
       fetch(this.$root.api.lists + this.checkinlist.id + '/status/')
@@ -559,6 +555,7 @@ export default {
               .then(data => {
                 this.statusLoading--
                 this.status = data
+                this.logo = data.event.logo
               })
               .catch(reason => {
                 this.statusLoading--

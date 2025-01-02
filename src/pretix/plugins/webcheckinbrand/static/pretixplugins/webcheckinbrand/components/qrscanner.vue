@@ -20,7 +20,19 @@ export default {
         return;
       }
 
-      const config = { fps: 10, qrbox : { width: 250, height: 250 }, aspectRatio: 1.777778};
+      let qrboxFunction = function(viewfinderWidth, viewfinderHeight) {
+        let minEdgePercentage = 0.7; // 70%
+        let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+        let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+        return {
+          width: qrboxSize,
+          height: qrboxSize
+        };
+      }
+
+      const config = { fps: 10, qrbox: qrboxFunction, videoConstraints: {
+          aspectRatio: 1.777778,
+        }, showTorchButtonIfSupported: true};
       this.qrCodeScanner = new window.Html5Qrcode("reader");
 
       this.qrCodeScanner.start(

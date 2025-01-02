@@ -11,9 +11,20 @@ body {
 
 .container {
   padding-top: 20px;
-  padding-bottom: 20px;
+  padding-bottom: 15px;
 }
 
+.header-logo {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+
+  img {
+    height: 80px;
+  }
+}
 .loading-icon {
   color: $brand-primary;
   -webkit-animation: fa-spin 8s infinite linear;

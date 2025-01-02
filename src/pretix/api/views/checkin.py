@@ -221,11 +221,11 @@ class CheckinListViewSet(viewsets.ModelViewSet):
                 checkedin=True,
             )
             pqs = clist.positions
-
             ev = clist.subevent or clist.event
             response = {
                 'event': {
                     'name': str(ev.name),
+                    'logo': "/media/"+ str(ev.settings.get('logo_image', as_type=str, default='')[7:])
                 },
                 'checkin_count': cqs.count(),
                 'position_count': pqs.count(),
@@ -432,8 +432,6 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
     if hasattr(user, 'checkinlist_id'):
             user_checkinlist_id = int(user.checkinlist_id)
             checkinlist_ids = [cl.pk for cl in checkinlists]
-            print(user_checkinlist_id)
-            print(checkinlist_ids)
             if user_checkinlist_id not in checkinlist_ids:
                 raise ValidationError('User does not have permission for the provided check-in list.')
 
