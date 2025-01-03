@@ -38,20 +38,22 @@
     {% endif %}
 
     <p>
-    {% if options == 0 and not seating_available %}
-        {% if request.event.has_subevents and not voucher.subevent %}
-            {% blocktrans trimmed %}
-                For the selected date, there are currently no products available that can be bought with this voucher. Please try a different date or a different voucher.
-            {% endblocktrans %}
+    {% if not request.event.is_voting %}
+        {% if options == 0 and not seating_available %}
+            {% if request.event.has_subevents and not voucher.subevent %}
+                {% blocktrans trimmed %}
+                    For the selected date, there are currently no products available that can be bought with this voucher. Please try a different date or a different voucher.
+                {% endblocktrans %}
+            {% else %}
+                {% blocktrans trimmed %}
+                    There are currently no products available that can be bought with this voucher.
+                {% endblocktrans %}
+            {% endif %}
         {% else %}
             {% blocktrans trimmed %}
-                There are currently no products available that can be bought with this voucher.
+                You entered a voucher code that allows you to buy one of the following products at the specified price:
             {% endblocktrans %}
         {% endif %}
-    {% else %}
-        {% blocktrans trimmed %}
-            You entered a voucher code that allows you to buy one of the following products at the specified price:
-        {% endblocktrans %}
     {% endif %}
     </p>
     {% if event.presale_is_running or event.settings.show_items_outside_presale_period %}
@@ -109,17 +111,17 @@
                                         </div>
                                     </div>
                                     <div class="col-md-2 col-sm-3 col-xs-6 price">
-                                        {% if item.min_price != item.max_price or item.free_price %}
-                                            {% blocktrans trimmed with minprice=item.min_price|money:event.currency %}
-                                                from {{ minprice }}
-                                            {% endblocktrans %}
-                                        {% elif not item.min_price and not item.max_price %}
-                                            {% if not item.mandatory_priced_addons or voucher.all_addons_included %}
-                                                <span class="text-uppercase">{% trans "free" context "price" %}</span>
+                                            {% if item.min_price != item.max_price or item.free_price %}
+                                                {% blocktrans trimmed with minprice=item.min_price|money:event.currency %}
+                                                    from {{ minprice }}
+                                                {% endblocktrans %}
+                                            {% elif not item.min_price and not item.max_price %}
+                                                {% if not item.mandatory_priced_addons or voucher.all_addons_included %}
+                                                    <span class="text-uppercase">{% trans "free" context "price" %}</span>
+                                                {% endif %}
+                                            {% else %}
+                                                {{ item.min_price|money:event.currency }}
                                             {% endif %}
-                                        {% else %}
-                                            {{ item.min_price|money:event.currency }}
-                                        {% endif %}
                                     </div>
                                     <div class="col-md-2 col-sm-3 col-xs-6 availability-box">
                                     </div>
@@ -336,36 +338,38 @@
                                                     step="any">
                                     </div>
                                     <p>
-                                    {% elif not item.display_price.gross %}
-                                        {% if not item.mandatory_priced_addons or item.original_price or voucher.all_addons_included %}
-                                            <span class="text-uppercase">{% trans "free" context "price" %}</span>
-                                        {% endif %}
-                                    {% elif event.settings.display_net_prices %}
-                                        {{ item.display_price.net|money:event.currency }}
-                                    {% else %}
-                                        {{ item.display_price.gross|money:event.currency }}
-                                    {% endif %}
-                                    {% if item.original_price %}
-                                        </ins>
-                                    {% endif %}
-                                    {% if item.includes_mixed_tax_rate %}
-                                        {% if event.settings.display_net_prices %}
-                                            <small>{% trans "plus taxes" %}</small>
+                                    {% if not request.event.is_voting %}
+                                        {% elif not item.display_price.gross %}
+                                            {% if not item.mandatory_priced_addons or item.original_price or voucher.all_addons_included %}
+                                                <span class="text-uppercase">{% trans "free" context "price" %}</span>
+                                            {% endif %}
+                                        {% elif event.settings.display_net_prices %}
+                                            {{ item.display_price.net|money:event.currency }}
                                         {% else %}
-                                            <small>{% trans "incl. taxes" %}</small>
+                                            {{ item.display_price.gross|money:event.currency }}
                                         {% endif %}
-                                    {% elif item.display_price.rate and item.display_price.gross and event.settings.display_net_prices %}
-                                        <small data-toggle="tooltip" title="{% blocktrans trimmed with value=item.display_price.gross|money:event.currency %}{{ value }} incl. taxes{% endblocktrans %}" data-placement="bottom">
-                                            {% blocktrans trimmed with rate=item.display_price.rate|floatformat:-2 name=item.display_price.name %}
-                                                <strong>plus</strong> {{ rate }}% {{ name }}
-                                            {% endblocktrans %}
-                                        </small>
-                                    {% elif item.display_price.rate and item.display_price.gross %}
-                                        <small data-toggle="tooltip" title="{% blocktrans trimmed with value=item.display_price.net|money:event.currency %}{{ value }} without taxes{% endblocktrans %}" data-placement="bottom">
-                                            {% blocktrans trimmed with rate=item.display_price.rate|floatformat:-2 name=item.display_price.name %}
-                                                incl. {{ rate }}% {{ name }}
-                                            {% endblocktrans %}
-                                        </small>
+                                        {% if item.original_price %}
+                                            </ins>
+                                        {% endif %}
+                                        {% if item.includes_mixed_tax_rate %}
+                                            {% if event.settings.display_net_prices %}
+                                                <small>{% trans "plus taxes" %}</small>
+                                            {% else %}
+                                                <small>{% trans "incl. taxes" %}</small>
+                                            {% endif %}
+                                        {% elif item.display_price.rate and item.display_price.gross and event.settings.display_net_prices %}
+                                            <small data-toggle="tooltip" title="{% blocktrans trimmed with value=item.display_price.gross|money:event.currency %}{{ value }} incl. taxes{% endblocktrans %}" data-placement="bottom">
+                                                {% blocktrans trimmed with rate=item.display_price.rate|floatformat:-2 name=item.display_price.name %}
+                                                    <strong>plus</strong> {{ rate }}% {{ name }}
+                                                {% endblocktrans %}
+                                            </small>
+                                        {% elif item.display_price.rate and item.display_price.gross %}
+                                            <small data-toggle="tooltip" title="{% blocktrans trimmed with value=item.display_price.net|money:event.currency %}{{ value }} without taxes{% endblocktrans %}" data-placement="bottom">
+                                                {% blocktrans trimmed with rate=item.display_price.rate|floatformat:-2 name=item.display_price.name %}
+                                                    incl. {{ rate }}% {{ name }}
+                                                {% endblocktrans %}
+                                            </small>
+                                        {% endif %}
                                     {% endif %}
                                     </p>
                                 </div>
@@ -434,8 +438,12 @@
                         <button class="btn btn-block btn-primary btn-lg" id="btn-add-to-cart" type="submit">
                             {% if request.event.settings.redirect_to_checkout_directly %}
                                 {% if allfree %}
-                                    <i class="fa fa-check" aria-hidden="true"></i> {% trans "Register" context "free_tickets" %}
-                                {% else %}
+                                    {% if not request.event.is_voting %}
+                                        <i class="fa fa-check" aria-hidden="true"></i> {% trans "Register" context "free_tickets" %}
+                                    {%else%}
+                                         <i class="fa fa-check" aria-hidden="true"></i> Wieter
+                                    {% endif %}
+                            {% else %}
                                     <i class="fa fa-shopping-cart" aria-hidden="true"></i> {% trans "Proceed with checkout" %}
                                 {% endif %}
                             {% else %}

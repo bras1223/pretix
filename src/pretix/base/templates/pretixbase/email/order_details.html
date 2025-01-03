@@ -54,9 +54,12 @@
     </div>
 {% else %}
     <div class="order-info">
-        {% trans "You are receiving this email because you placed an order for the following event:" %}
+        {% if not request.event.is_voting %}
+            {% trans "You are receiving this email because you placed an order for the following event:" %}
+        {% endif %}
     </div>
-    <table class="order-details">
+    {% if not request.event.is_voting %}
+        <table class="order-details">
         <tr>
             <td>
                 <strong>{% trans "Event:" %}</strong>
@@ -142,9 +145,14 @@
             </td>
         </tr>
     </table>
+    {% endif %}
     <div class="order-button">
         <a href="{% abseventurl event "presale:event.order.open" hash=order.email_confirm_secret order=order.code secret=order.secret %}" class="button">
+        {% if not request.event.is_voting %}
             {% trans "View order details" %}
+        {%else%}
+            Bekiektj details
+        {% endif %}
         </a>
     </div>
 {% endif %}

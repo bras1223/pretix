@@ -1705,7 +1705,7 @@ class Question(LoggedModel):
     )
     unique = models.BooleanField(
             verbose_name=_('Uniek'),
-            help_text=_('Antwoord moet uniek zijn'),
+            help_text=_('Good geperbieërdj, mer gae moogtj mer eine kieër op dieës artiest stumme! ;-)'),
             default=False
     )
     hidden = models.BooleanField(

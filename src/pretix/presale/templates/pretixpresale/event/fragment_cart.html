@@ -51,7 +51,13 @@
                 {% endif %}
                 {% if line.voucher %}
                     <div class="cart-icon-details">
-                        <dt><span class="fa fa-tags fa-fw" aria-hidden="true"></span> {% trans "Voucher code used:" %}</dt>
+                        <dt><span class="fa fa-tags fa-fw" aria-hidden="true"></span>
+                            {% if not request.event.is_voting %}
+                                {% trans "Voucher code used:" %}
+                            {% else %}
+                                Gebroêkdje voucher:
+                            {% endif %}
+                        </dt>
                         <dd>{{ line.voucher.code }}</dd>
                     </div>
                 {% endif %}
@@ -274,7 +280,7 @@
                         {% endif %}
                     </div>
                 {% endif %}
-            {% else %}
+            {% elif not request.event.is_voting %}
                 <div role="cell" class="count">
                     {% if editable %}
                     <form action="{% eventurl event "presale:event.cart.remove" cart_namespace=cart_namespace|default_if_none:"" %}"
@@ -342,7 +348,7 @@
                     </div>
                 {% endif %}
             {% endif %}
-            {% if not hide_prices %}
+            {% if not hide_prices and not request.event.is_voting %}
                 <div role="cell" class="totalprice price">
                     {% if event.settings.display_net_prices %}
                         <strong>{{ line.net_total|money:event.currency }}</strong>
@@ -444,6 +450,8 @@
                 <div class="clearfix"></div>
             </div>
         {% endif %}
+
+            {% if not request.event.is_voting %}
             <div role="row" class="row cart-row total">
                 <div role="cell" class="product">
                     <strong>{% trans "Total" %}</strong><br>
@@ -470,10 +478,12 @@
                 </div>
                 <div class="clearfix"></div>
             </div>
+            {% endif %}
         </div>
     {% endif %}
 </div>
 
+{% if not request.event.is_voting %}
 <div class="row">
     <div class="col-md-12">
     {% if not cart.is_ordered %}
@@ -492,3 +502,4 @@
     </div>
     <div class="clearfix"></div>
 </div>
+{% endif %}

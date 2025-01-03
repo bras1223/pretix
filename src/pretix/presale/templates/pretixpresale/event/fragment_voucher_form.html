@@ -23,7 +23,11 @@
         <input type="hidden" name="next" value="{% if next_url %}{{ next_url }}{% else %}{{ request.path }}{% endif %}" />
         <div class="col-md-4 col-sm-6 col-xs-12">
             <button class="btn btn-block btn-primary" type="submit">
+                {% if not request.event.is_voting %}
                 {% trans "Redeem voucher" %}
+                {%else%}
+                Voucher verzûlvere
+                {%endif%}
             </button>
         </div>
         <div class="clearfix"></div>

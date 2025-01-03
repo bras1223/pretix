@@ -9,13 +9,17 @@
 {% load rich_text %}
 {% block title %}
     {% if "thanks" in request.GET or "paid" in request.GET %}
-        {% trans "Thank you!" %}
-        {% if order.status != 'p' %}
-            {% trans "Your order has been placed successfully. See below for details." %}
-        {% elif order.total == 0 %}
-            {% trans "Your order has been processed successfully! See below for details." %}
+        {% if not request.event.is_voting %}
+            {% trans "Thank you!" %}
+            {% if order.status != 'p' %}
+                {% trans "Your order has been placed successfully. See below for details." %}
+            {% elif order.total == 0 %}
+                {% trans "Your order has been processed successfully! See below for details." %}
+            {% else %}
+                {% trans "We successfully received your payment. See below for details." %}
+            {% endif %}
         {% else %}
-            {% trans "We successfully received your payment. See below for details." %}
+            Bedânktj! Vae hebbe eur stum ontvânge.
         {% endif %}
     {% endif %}
     {% trans "Order details" %}
@@ -25,8 +29,11 @@
     {% if "thanks" in request.GET or "paid" in request.GET %}
         <div class="thank-you">
             <span class="fa fa-check-circle" aria-hidden="true"></span>
-
-            <h2 class="h1">{% trans "Thank you!" %}</h2>
+            {% if not request.event.is_voting %}
+                <h2 class="h1">{% trans "Thank you!" %}</h2>
+            {% else %}
+                <h2 class="h1">Bedânktj!</h2>
+            {% endif %}
             {% if order.status != 'p' %}
                 <p class="lead">
                     {% trans "Your order has been placed successfully. See below for details." %}<br>
@@ -45,13 +52,18 @@
                     {% endif %}
                 </p>
             {% elif order.total == 0 %}
-                <p class="lead">{% trans "Your order has been processed successfully! See below for details." %}</p>
+                {% if not request.event.is_voting %}
+                    <p class="lead">{% trans "Your order has been processed successfully! See below for details." %}</p>
+                {% else %}
+                    <p class="lead">Vae hebbe eur stum ontvânge...</p>
+                {% endif %}
             {% else %}
                 <p class="lead">{% trans "We successfully received your payment. See below for details." %}</p>
             {% endif %}
             {% if request.event.settings.checkout_success_text %}
                 {{ request.event.settings.checkout_success_text|rich_text }}
             {% endif %}
+            {% if not request.event.is_voting %}
             <p class="iframe-hidden">{% blocktrans trimmed %}
                 Please bookmark or save the link to this exact page if you want to access your order later. We also sent you an email containing the link to the address you specified.
             {% endblocktrans %}</p>
@@ -60,10 +72,14 @@
                 also sent you an email containing the link to the address you specified.
             {% endblocktrans %}<br>
                 <code>{{ url }}</code></p>
+            {%endif%}
         </div>
     {% endif %}
 
-    <h2 class="h1">{% trans "Order" %} {{ order.code }}
+    <h2 class="h1">
+        {% if not request.event.is_voting %}
+        {% trans "Order" %} {{ order.code }}
+        {%endif%}
         {% if order.testmode %}
             <span class="label label-warning">{% trans "TEST MODE" %}</span>
         {% endif %}
@@ -193,7 +209,11 @@
     <div class="panel panel-default cart">
         <div class="panel-heading">
             <h3 class="panel-title">
-                {% trans "Ordered items" %}
+                {% if not request.event.is_voting %}
+                    {% trans "Ordered items" %}
+                {% else %}
+                    Eur stum
+                {% endif %}
                 {% if order.can_modify_answers %}
                     <a href="{% eventurl event "presale:event.order.modify" secret=order.secret order=order.code %}" aria-label="{% trans "Change ordered items" %}" class="h6">
                         <span class="fa fa-edit" aria-hidden="true"></span>{% trans "Change details" %}
@@ -283,7 +303,11 @@
             <div class="panel panel-default">
                 <div class="panel-heading">
                     <h3 class="panel-title">
-                        {% trans "Your information" %}
+                        {% if not request.event.is_voting %}
+                            {% trans "Your information" %}
+                        {% else %}
+                            Eur gegaeves
+                        {% endif %}
                         {% if invoice_address_asked or request.event.settings.invoice_name_required %}
                             {% if order.can_modify_answers %}
                                 <a href="{% eventurl event "presale:event.order.modify" secret=order.secret order=order.code %}" aria-label="{% trans "Change your information" %}" class="h6">

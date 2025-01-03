@@ -448,6 +448,7 @@ class EventUpdateForm(I18nModelForm):
             'geo_lon',
             'all_sales_channels',
             'limit_sales_channels',
+            'is_voting'
         ]
         field_classes = {
             'date_from': SplitDateTimeField,

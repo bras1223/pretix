@@ -18,8 +18,12 @@
     {% if order.count_positions == 0 %}
         {% textbubble "info" icon="info-circle" %}{% trans "Canceled (paid fee)" %}{% endtextbubble %}
     {% elif order.total == 0 %}
-        {% textbubble "success" icon="check" %}{% trans "Confirmed" context "order state" %}{% endtextbubble %}
-    {% else %}
+        {% if not request.event.is_voting %}
+            {% textbubble "success" icon="check" %}{% trans "Confirmed" context "order state" %}{% endtextbubble %}
+        {% else %}
+            {% textbubble "success" icon="check" %}{% trans "Bevestigdj" context "order state" %}{% endtextbubble %}
+        {%endif%}
+{% else %}
         {% textbubble "success" icon="check" %}{% trans "Paid" %}{% endtextbubble %}
     {% endif %}
 {% elif order.status == "e" %}

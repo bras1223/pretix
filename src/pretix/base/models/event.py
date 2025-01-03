@@ -587,6 +587,9 @@ class Event(EventMixin, LoggedModel):
     is_public = models.BooleanField(default=True,
                                     verbose_name=_("Show in lists"),
                                     help_text=_("If selected, this event will show up publicly on the list of events for your organizer account."))
+    is_voting = models.BooleanField(default=False,
+                                        verbose_name=_("Voting"),
+                                        help_text=_("If selected, this event will be adapted for voting. This will remove all pricing-references"))
     presale_end = models.DateTimeField(
         null=True, blank=True,
         verbose_name=_("End of presale"),

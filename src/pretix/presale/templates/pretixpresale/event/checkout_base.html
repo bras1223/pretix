@@ -12,6 +12,7 @@
     {% trans "Checkout" %}
 {% endblock %}
 {% block content %}
+{% if not request.event.is_voting %}
 <aside aria-label="{% trans "Your cart" %}">
     <details class="panel panel-default cart{% if "open_cart" not in request.GET %} sneak-peek{% endif %}" {% if "open_cart" in request.GET %}open{% endif %}>
         <summary class="panel-heading">
@@ -55,8 +56,13 @@
         {% endif %}
     {% endif %}
 </aside>
+{% endif %}
 <main aria-label="{% trans "Checkout" %}">
-    <h2>{% trans "Checkout" %}</h2>
+    {% if not request.event.is_voting %}
+        <h2>{% trans "Checkout" %}</h2>
+    {% else %}
+        <h2>Stumme</h2>
+    {% endif %}
     {% include "pretixpresale/event/fragment_checkoutflow.html" %}
     {% block inner %}
     {% endblock %}
