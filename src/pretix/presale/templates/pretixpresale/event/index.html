@@ -139,9 +139,13 @@
                     {% if event.settings.presale_has_ended_text %}
                         {{ event.settings.presale_has_ended_text|rich_text }}
                     {% else %}
-                        {% blocktrans trimmed %}
-                            The booking period for this event is over.
-                        {% endblocktrans %}
+                        {% if not request.event.is_voting %}
+                            {% blocktrans trimmed %}
+                                The booking period for this event is over.
+                            {% endblocktrans %}
+                        {%else%}
+                            `t és neet mieër muuëgelik um te stumme...
+                        {%endif%}
                     {% endif %}
                 {% elif event.settings.presale_start_show_date %}
                     {% with date=ev.effective_presale_start|date:"SHORT_DATE_FORMAT" date_normalized=ev.effective_presale_start|date:"Y-m-d" %}
@@ -154,9 +158,14 @@
                     {% endwith %}
                     {% endwith %}
                 {% else %}
-                    {% blocktrans trimmed %}
+                    {% if not request.event.is_voting %}
+                        {% blocktrans trimmed %}
                         The booking period for this event has not yet started.
-                    {% endblocktrans %}
+                        {% endblocktrans %}
+                    {%else%}
+                    't és nog neet muuëgelik um te stumme...
+                    {%endif%}
+
                 {% endif %}
             </div>
         {% endif %}

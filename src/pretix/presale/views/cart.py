@@ -487,8 +487,10 @@ class CartClear(EventViewMixin, CartActionMixin, AsyncAction, View):
 
     def get_success_message(self, value):
         create_empty_cart_id(self.request)
-        return _('Your cart is now empty.')
-
+        if not self.request.event.is_voting:
+            return _('Your cart is now empty.')
+        else:
+            return _('Stumme geannulieërdj')
     def post(self, request, *args, **kwargs):
         return self.do(self.request.event.id, get_or_create_cart_id(self.request), translation.get_language(),
                        request.sales_channel.identifier, time_machine_now(default=None))
@@ -502,7 +504,11 @@ class CartAdd(EventViewMixin, CartActionMixin, AsyncAction, View):
     known_errortypes = ['CartError']
 
     def get_success_message(self, value):
-        return _('The products have been successfully added to your cart.')
+        if not self.request.event.is_voting:
+            return _('The products have been successfully added to your cart.')
+        else:
+            return _('Gae moogtj stumme! Vultj heej eur emailadres en top dri-j in.')
+
 
     def _ajax_response_data(self):
         cart_id = get_or_create_cart_id(self.request)
@@ -639,7 +645,10 @@ class RedeemView(NoSearchIndexViewMixin, EventViewMixin, CartMixin, TemplateView
             try:
                 self.voucher = Voucher.objects.get(code__iexact=v, event=request.event)
                 if self.voucher.redeemed >= self.voucher.max_usages:
-                    err = error_messages['voucher_redeemed']
+                    if self.request.event.is_voting:
+                        err = "Dieëze voucher és al 'ne kieër gebroêktj..."
+                    else:
+                        err = error_messages['voucher_redeemed']
                 if self.voucher.valid_until is not None and self.voucher.valid_until < now():
                     err = error_messages['voucher_expired']
                 if self.voucher.item is not None and self.voucher.item.is_available() is False:
@@ -651,7 +660,10 @@ class RedeemView(NoSearchIndexViewMixin, EventViewMixin, CartMixin, TemplateView
                 )
                 v_avail = self.voucher.max_usages - self.voucher.redeemed - redeemed_in_carts.count()
                 if v_avail < 1 and not err:
-                    err = error_messages['voucher_redeemed_cart'] % self.request.event.settings.reservation_time
+                   if self.request.event.is_voting:
+                        err = "Dieëze voucher wurtj al gebroêktj..."
+                   else:
+                        err = error_messages['voucher_redeemed_cart'] % self.request.event.settings.reservation_time
             except Voucher.DoesNotExist:
                 if self.request.event.organizer.accepted_gift_cards.filter(secret__iexact=request.GET.get("voucher")).exists():
                     err = error_messages['gift_card']
@@ -668,7 +680,10 @@ class RedeemView(NoSearchIndexViewMixin, EventViewMixin, CartMixin, TemplateView
             err = error_messages['ended']
         elif not request.event.presale_is_running or (
                 request.event.presale_start and time_machine_now() < request.event.presale_start):
-            err = error_messages['not_started']
+            if self.request.event.is_voting:
+                err = "`t és nog neet muuëgelik um te stumme..."
+            else:
+                err = error_messages['not_started']
 
         self.subevent = None
         if request.event.has_subevents:
@@ -696,8 +711,34 @@ class RedeemView(NoSearchIndexViewMixin, EventViewMixin, CartMixin, TemplateView
             messages.error(request, str(err))
             return redirect_to_url(self.get_next_url() + "?voucher_invalid")
 
+        context = self.get_context_data(**kwargs)
+        if self.request.event.is_voting and context['options'] == 1 and v:
+            for category, items in context['items_by_category']:
+                    if items:
+                        item = items[0]  # Access the first item in the category
+                        self.add_item_to_cart(item, v)
+                        return redirect_to_url(eventreverse(self.request.event, 'presale:event.checkout.start'))
+
         return super().dispatch(request, *args, **kwargs)
 
+    def add_item_to_cart(self, item, voucher):
+            """
+            Automatically adds the single item to the cart.
+            """
+            cart_id = get_or_create_cart_id(self.request)
+            add_items_to_cart(
+                self.request.event.id,
+                [{
+                    'item': item.pk,
+                    'variation': None,
+                    'count': 1,
+                    'price': item.default_price,
+                    'voucher': voucher,
+                    'subevent': self.subevent.pk if self.subevent else None
+                }],
+                cart_id,
+                translation.get_language()
+            )
     def get_next_url(self):
         if "next" in self.request.GET and url_has_allowed_host_and_scheme(self.request.GET.get("next"), allowed_hosts=None):
             return self.request.GET.get("next")

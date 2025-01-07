@@ -725,7 +725,10 @@ def _check_positions(event: Event, now_dt: datetime, time_machine_now_dt: dateti
                 v_avail[cp.voucher] = cp.voucher.max_usages - cp.voucher.redeemed - redeemed_in_carts.count()
             v_avail[cp.voucher] -= 1
             if v_avail[cp.voucher] < 0:
-                err = err or error_messages['voucher_redeemed']
+                if event.is_voting:
+                    err = "Dieëze voucher és al 'ne kieër gebroêktj..."
+                else:
+                    err = err or error_messages['voucher_redeemed']
                 delete(cp)
                 continue
 

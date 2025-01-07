@@ -996,7 +996,7 @@ class BaseQuestionsForm(forms.Form):
 
                 if normalized_answer in unique_answers:
                     print("not unique")
-                    raise ValidationError({'question_%d' % q.pk: [_('Dit antwoord moet uniek zijn.')]})
+                    raise ValidationError({'question_%d' % q.pk: [_('Good geperbieërdj, mer gae moogtj mer eine kieër op dieës artiest stumme! ;-)')]})
                 if normalized_answer:
                             unique_answers[normalized_answer] = True
 

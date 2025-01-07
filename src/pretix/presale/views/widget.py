@@ -749,7 +749,11 @@ class WidgetAPIProductList(EventListMixin, View):
             data['vouchers_exist'] = False
             if ev.presale_has_ended:
                 if request.event.settings.presale_has_ended_text:
-                    data['error'] = str(request.event.settings.presale_has_ended_text)
+                     if not request.event.is_voting:
+                        data['error'] = str(request.event.settings.presale_has_ended_text)
+                     else:
+                        data['error'] = gettext('`t és neet mieër muuëgelik um te stumme...')
+
                 else:
                     data['error'] = gettext('The booking period for this event is over.')
             elif request.event.settings.presale_start_show_date:
@@ -758,7 +762,10 @@ class WidgetAPIProductList(EventListMixin, View):
                     'time': date_format(ev.effective_presale_start.astimezone(request.event.timezone), "TIME_FORMAT"),
                 }
             else:
-                data['error'] = gettext('The booking period for this event has not yet started.')
+                if not request.event.is_voting:
+                    data['error'] = gettext('The booking period for this event has not yet started.')
+                else:
+                    data['error'] = gettext('`t és nog neet muuëgelik um te stumme...`')
 
         self.voucher = None
         if 'voucher' in request.GET:
