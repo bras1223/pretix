@@ -442,8 +442,12 @@ class Item(LoggedModel):
     UNAVAIL_MODE_INFO = "info"
     UNAVAIL_MODES = (
         (UNAVAIL_MODE_HIDDEN, _("Hide product if unavailable")),
-        (UNAVAIL_MODE_INFO, _("Show info text if unavailable")),
+        (UNAVAIL_MODE_INFO, _("Show product with info on why it’s unavailable")),
     )
+    UNAVAIL_MODE_ICONS = {
+        UNAVAIL_MODE_HIDDEN: 'eye-slash',
+        UNAVAIL_MODE_INFO: 'info'
+    }
 
     MEDIA_POLICY_REUSE = 'reuse'
     MEDIA_POLICY_NEW = 'new'
@@ -595,6 +599,11 @@ class Item(LoggedModel):
                     "swap out products for more expensive ones once the cheaper option is sold out. There might "
                     "be a short period in which both products are visible while all tickets of the referenced "
                     "product are reserved, but not yet sold.")
+    )
+    hidden_if_item_available_mode = models.CharField(
+        choices=UNAVAIL_MODES,
+        default=UNAVAIL_MODE_HIDDEN,
+        max_length=16,
     )
     require_voucher = models.BooleanField(
         verbose_name=_('This product can only be bought using a voucher.'),
@@ -837,7 +846,7 @@ class Item(LoggedModel):
 
         if not self.tax_rule:
             t = TaxedPrice(gross=price - bundled_sum, net=price - bundled_sum, tax=Decimal('0.00'),
-                           rate=Decimal('0.00'), name='')
+                           rate=Decimal('0.00'), name='', code=None)
         else:
             t = self.tax_rule.tax(price, base_price_is=base_price_is, invoice_address=invoice_address,
                                   override_tax_rate=override_tax_rate, currency=currency or self.event.currency,
@@ -845,6 +854,7 @@ class Item(LoggedModel):
 
         if bundled_sum:
             t.name = "MIXED!"
+            t.code = None
             t.gross += bundled_sum
             t.net += bundled_sum_net
             t.tax += bundled_sum_tax
@@ -884,6 +894,8 @@ class Item(LoggedModel):
             return 'available_from'
         elif subevent_item and subevent_item.available_until and subevent_item.available_until < now_dt:
             return 'available_until'
+        elif self.hidden_if_item_available and self._dependency_available:
+            return 'hidden_if_item_available'
         else:
             return None
 
@@ -1258,7 +1270,7 @@ class ItemVariation(models.Model):
 
         if not self.item.tax_rule:
             t = TaxedPrice(gross=price, net=price, tax=Decimal('0.00'),
-                           rate=Decimal('0.00'), name='')
+                           rate=Decimal('0.00'), name='', code=None)
         else:
             t = self.item.tax_rule.tax(price, base_price_is=base_price_is, currency=currency,
                                        override_tax_rate=override_tax_rate,
@@ -1280,6 +1292,7 @@ class ItemVariation(models.Model):
                     t.net += bprice.net - compare_price.net
                     t.tax += bprice.tax - compare_price.tax
                     t.name = "MIXED!"
+                    t.code = None
 
         return t
 
@@ -1721,10 +1734,10 @@ class Question(LoggedModel):
         'Question', null=True, blank=True, on_delete=models.SET_NULL, related_name='dependent_questions'
     )
     dependency_values = MultiStringField(default=[])
-    valid_number_min = models.DecimalField(decimal_places=6, max_digits=16, null=True, blank=True,
+    valid_number_min = models.DecimalField(decimal_places=6, max_digits=30, null=True, blank=True,
                                            verbose_name=_('Minimum value'),
                                            help_text=_('Currently not supported in our apps and during check-in'))
-    valid_number_max = models.DecimalField(decimal_places=6, max_digits=16, null=True, blank=True,
+    valid_number_max = models.DecimalField(decimal_places=6, max_digits=30, null=True, blank=True,
                                            verbose_name=_('Maximum value'),
                                            help_text=_('Currently not supported in our apps and during check-in'))
     valid_date_min = models.DateField(null=True, blank=True,

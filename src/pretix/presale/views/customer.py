@@ -77,7 +77,7 @@ class RedirectBackMixin:
             self.redirect_field_name,
             self.request.GET.get(self.redirect_field_name, '')
         )
-        hosts = list(KnownDomain.objects.filter(event__organizer=self.request.organizer).values_list('domainname', flat=True))
+        hosts = list(KnownDomain.objects.filter(organizer=self.request.organizer).values_list('domainname', flat=True))
         siteurlsplit = urlsplit(settings.SITE_URL)
         if siteurlsplit.port and siteurlsplit.port not in (80, 443):
             hosts = ['%s:%d' % (h, siteurlsplit.port) for h in hosts]
@@ -168,7 +168,7 @@ class LogoutView(View):
         return HttpResponseRedirect(next_page)
 
     def get_next_page(self):
-        if getattr(self.request, 'event_domain', False):
+        if getattr(self.request, 'domain_mode', 'system') in (KnownDomain.MODE_ORG_ALT_DOMAIN, KnownDomain.MODE_EVENT_DOMAIN):
             # After we cleared the cookies on this domain, redirect to the parent domain to clear cookies as well
             next_page = eventreverse(self.request.organizer, 'presale:organizer.customer.logout', kwargs={})
             if self.redirect_field_name in self.request.POST or self.redirect_field_name in self.request.GET:
@@ -188,7 +188,7 @@ class LogoutView(View):
                     self.redirect_field_name,
                     self.request.GET.get(self.redirect_field_name)
                 )
-                hosts = list(KnownDomain.objects.filter(event__organizer=self.request.organizer).values_list('domainname', flat=True))
+                hosts = list(KnownDomain.objects.filter(organizer=self.request.organizer).values_list('domainname', flat=True))
                 siteurlsplit = urlsplit(settings.SITE_URL)
                 if siteurlsplit.port and siteurlsplit.port not in (80, 443):
                     hosts = ['%s:%d' % (h, siteurlsplit.port) for h in hosts]
@@ -676,6 +676,8 @@ class SSOLoginView(RedirectBackMixin, View):
                 popup_origin = None
 
         nonce = get_random_string(32)
+        pkce_code_verifier = get_random_string(64)
+        request.session[f'pretix_customerauth_{self.provider.pk}_pkce_code_verifier'] = pkce_code_verifier
         request.session[f'pretix_customerauth_{self.provider.pk}_nonce'] = nonce
         request.session[f'pretix_customerauth_{self.provider.pk}_popup_origin'] = popup_origin
         request.session[f'pretix_customerauth_{self.provider.pk}_cross_domain_requested'] = self.request.GET.get("request_cross_domain_customer_auth") == "true"
@@ -684,7 +686,7 @@ class SSOLoginView(RedirectBackMixin, View):
         })
 
         if self.provider.method == "oidc":
-            return redirect_to_url(oidc_authorize_url(self.provider, f'{nonce}%{next_url}', redirect_uri))
+            return redirect_to_url(oidc_authorize_url(self.provider, f'{nonce}%{next_url}', redirect_uri, pkce_code_verifier))
         else:
             raise Http404("Unknown SSO method.")
 
@@ -718,6 +720,7 @@ class SSOLoginReturnView(RedirectBackMixin, View):
                 )
             return HttpResponseRedirect(redirect_to)
         r = super().dispatch(request, *args, **kwargs)
+        request.session.pop(f'pretix_customerauth_{self.provider.pk}_pkce_code_verifier', None)
         request.session.pop(f'pretix_customerauth_{self.provider.pk}_nonce', None)
         request.session.pop(f'pretix_customerauth_{self.provider.pk}_popup_origin', None)
         request.session.pop(f'pretix_customerauth_{self.provider.pk}_cross_domain_requested', None)
@@ -743,7 +746,7 @@ class SSOLoginReturnView(RedirectBackMixin, View):
                     popup_origin,
                 )
 
-            nonce, redirect_to = re.split("[%#§]", request.GET['state'], 1)  # Allow § and # for backwards-compatibility for a while
+            nonce, redirect_to = re.split("[%#§]", request.GET['state'], maxsplit=1)  # Allow § and # for backwards-compatibility for a while
 
             if nonce != request.session.get(f'pretix_customerauth_{self.provider.pk}_nonce'):
                 return self._fail(
@@ -763,6 +766,7 @@ class SSOLoginReturnView(RedirectBackMixin, View):
                     self.provider,
                     request.GET.get('code'),
                     redirect_uri,
+                    request.session.get(f'pretix_customerauth_{self.provider.pk}_pkce_code_verifier'),
                 )
             except ValidationError as e:
                 for msg in e:

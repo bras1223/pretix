@@ -98,8 +98,9 @@ from pretix.base.services.quotas import QuotaAvailability
 from pretix.base.services.tasks import ProfiledEventTask, ProfiledTask
 from pretix.base.signals import (
     order_approved, order_canceled, order_changed, order_denied, order_expired,
-    order_fee_calculation, order_paid, order_placed, order_reactivated,
-    order_split, order_valid_if_pending, periodic_task, validate_order,
+    order_expiry_changed, order_fee_calculation, order_paid, order_placed,
+    order_reactivated, order_split, order_valid_if_pending, periodic_task,
+    validate_order,
 )
 from pretix.base.timemachine import time_machine_now, time_machine_now_assigned
 from pretix.celery_app import app
@@ -302,6 +303,7 @@ def extend_order(order: Order, new_date: datetime, force: bool=False, valid_if_p
                     'state_change': was_expired
                 }
             )
+            order_expiry_changed.send(sender=order.event, order=order)
 
         if was_expired:
             num_invoices = order.invoices.filter(is_cancellation=False).count()
@@ -876,7 +878,8 @@ def _check_positions(event: Event, now_dt: datetime, time_machine_now_dt: dateti
         event,
         sales_channel.identifier,
         [
-            (cp.item_id, cp.subevent_id, cp.line_price_gross, bool(cp.addon_to), cp.is_bundled, cp.listed_price - cp.price_after_voucher)
+            (cp.item_id, cp.subevent_id, cp.subevent.date_from if cp.subevent_id else None, cp.line_price_gross,
+             bool(cp.addon_to), cp.is_bundled, cp.listed_price - cp.price_after_voucher)
             for cp in sorted_positions
         ]
     )
@@ -1726,16 +1729,17 @@ class OrderChangeManager:
 
             try:
                 new_rate = tax_rule.tax_rate_for(ia)
+                new_code = tax_rule.tax_code_for(ia)
             except TaxRule.SaleNotAllowed:
                 raise OrderError(error_messages['tax_rule_country_blocked'])
             # We use override_tax_rate to make sure .tax() doesn't get clever and re-adjusts the pricing itself
-            if new_rate != pos.tax_rate:
+            if new_rate != pos.tax_rate or new_code != pos.tax_code:
                 if keep == 'net':
                     new_tax = tax_rule.tax(pos.price - pos.tax_value, base_price_is='net', currency=self.event.currency,
-                                           override_tax_rate=new_rate)
+                                           override_tax_rate=new_rate, override_tax_code=new_code)
                 else:
                     new_tax = tax_rule.tax(pos.price, base_price_is='gross', currency=self.event.currency,
-                                           override_tax_rate=new_rate)
+                                           override_tax_rate=new_rate, override_tax_code=new_code)
                 self._totaldiff += new_tax.gross - pos.price
                 self._operations.append(self.PriceOperation(pos, new_tax, new_tax.gross - pos.price))
                 self._invoice_dirty = True
@@ -2309,6 +2313,7 @@ class OrderChangeManager:
                 op.position.price = op.price.gross
                 op.position.tax_rate = op.price.rate
                 op.position.tax_value = op.price.tax
+                op.position.tax_code = op.price.code
                 op.position.save()
             elif isinstance(op, self.TaxRuleOperation):
                 if isinstance(op.position, OrderPosition):
@@ -2405,7 +2410,7 @@ class OrderChangeManager:
             elif isinstance(op, self.AddOperation):
                 pos = OrderPosition.objects.create(
                     item=op.item, variation=op.variation, addon_to=op.addon_to,
-                    price=op.price.gross, order=self.order, tax_rate=op.price.rate,
+                    price=op.price.gross, order=self.order, tax_rate=op.price.rate, tax_code=op.price.code,
                     tax_value=op.price.tax, tax_rule=op.item.tax_rule,
                     positionid=nextposid, subevent=op.subevent, seat=op.seat,
                     used_membership=op.membership, valid_from=op.valid_from, valid_until=op.valid_until,
@@ -2428,6 +2433,8 @@ class OrderChangeManager:
             elif isinstance(op, self.SplitOperation):
                 split_positions.append(op.position)
             elif isinstance(op, self.RegenerateSecretOperation):
+                op.position.web_secret = generate_secret()
+                op.position.save(update_fields=["web_secret"])
                 assign_ticket_secret(
                     event=self.event, position=op.position, force_invalidate=True, save=True
                 )
@@ -2534,6 +2541,7 @@ class OrderChangeManager:
                 'new_order': split_order.code,
             })
             op.order = split_order
+            op.web_secret = generate_secret()
             assign_ticket_secret(
                 self.event, position=op, force_invalidate=True,
             )
@@ -3114,14 +3122,34 @@ def change_payment_provider(order: Order, payment_provider, amount=None, new_pay
             }
         )
 
+    new_invoice_created = False
     if recreate_invoices:
+        # Lock to prevent duplicate invoice creation
+        order = Order.objects.select_for_update(of=OF_SELF).get(pk=order.pk)
+
         i = order.invoices.filter(is_cancellation=False).last()
-        if i and order.total != oldtotal and not i.canceled:
+        has_active_invoice = i and not i.canceled
+
+        if has_active_invoice and order.total != oldtotal:
             generate_cancellation(i)
             generate_invoice(order)
+            new_invoice_created = True
+
+        elif (not has_active_invoice or order.invoice_dirty) and invoice_qualified(order):
+            if order.event.settings.get('invoice_generate') == 'True' or (
+                order.event.settings.get('invoice_generate') == 'paid' and
+                new_payment.payment_provider.requires_invoice_immediately
+            ):
+                if has_active_invoice:
+                    generate_cancellation(i)
+                i = generate_invoice(order)
+                new_invoice_created = True
+                order.log_action('pretix.event.order.invoice.generated', data={
+                    'invoice': i.pk
+                })
 
     order.create_transactions()
-    return old_fee, new_fee, fee, new_payment
+    return old_fee, new_fee, fee, new_payment, new_invoice_created
 
 
 @receiver(order_paid, dispatch_uid="pretixbase_order_paid_giftcards")

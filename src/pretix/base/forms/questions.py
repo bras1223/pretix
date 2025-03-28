@@ -83,8 +83,8 @@ from pretix.base.services.tax import (
     VATIDFinalError, VATIDTemporaryError, validate_vat_id,
 )
 from pretix.base.settings import (
-    COUNTRIES_WITH_STATE_IN_ADDRESS, PERSON_NAME_SALUTATIONS,
-    PERSON_NAME_SCHEMES, PERSON_NAME_TITLE_GROUPS,
+    COUNTRIES_WITH_STATE_IN_ADDRESS, COUNTRY_STATE_LABEL,
+    PERSON_NAME_SALUTATIONS, PERSON_NAME_SCHEMES, PERSON_NAME_TITLE_GROUPS,
 )
 from pretix.base.templatetags.rich_text import rich_text
 from pretix.base.timemachine import time_machine_now
@@ -127,7 +127,13 @@ class NamePartsWidget(forms.MultiWidget):
             if fname == 'title' and self.titles:
                 widgets.append(Select(attrs=a, choices=[('', '')] + [(d, d) for d in self.titles[1]]))
             elif fname == 'salutation':
-                widgets.append(Select(attrs=a, choices=[('', '---'), ('empty', '')] + PERSON_NAME_SALUTATIONS))
+                widgets.append(Select(
+                    attrs=a,
+                    choices=[
+                        ('', '---'),
+                        ('empty', '({})'.format(pgettext_lazy("name_salutation", "not specified"))),
+                    ] + PERSON_NAME_SALUTATIONS
+                ))
             else:
                 widgets.append(self.widget(attrs=a))
         super().__init__(widgets, attrs)
@@ -245,7 +251,10 @@ class NamePartsFormField(forms.MultiValueField):
                 d.pop('validators', None)
                 field = forms.ChoiceField(
                     **d,
-                    choices=[('', '---'), ('empty', '')] + PERSON_NAME_SALUTATIONS
+                    choices=[
+                        ('', '---'),
+                        ('empty', '({})'.format(pgettext_lazy("name_salutation", "not specified"))),
+                    ] + PERSON_NAME_SALUTATIONS
                 )
             else:
                 field = forms.CharField(**defaults)
@@ -275,6 +284,10 @@ class NamePartsFormField(forms.MultiValueField):
             value["salutation"] = ""
 
         return value
+
+
+def name_parts_is_empty(name_parts_dict):
+    return not any(k != "_scheme" and v for k, v in name_parts_dict.items())
 
 
 class WrappedPhonePrefixSelect(Select):
@@ -717,7 +730,7 @@ class BaseQuestionsForm(forms.Form):
                     'data-country-information-url': reverse('js_helpers.states'),
                 }),
             )
-            c = [('', pgettext_lazy('address', 'Select state'))]
+            c = [('', '---')]
             fprefix = str(self.prefix) + '-' if self.prefix is not None and self.prefix != '-' else ''
             cc = None
             state = None
@@ -1035,15 +1048,26 @@ class BaseInvoiceAddressForm(forms.ModelForm):
                 'autocomplete': 'address-level2',
             }),
             'company': forms.TextInput(attrs={
-                'data-display-dependency': '#id_is_business_1',
                 'autocomplete': 'organization',
             }),
-            'vat_id': forms.TextInput(attrs={'data-display-dependency': '#id_is_business_1'}),
+            'vat_id': forms.TextInput(),
             'internal_reference': forms.TextInput,
         }
         labels = {
             'is_business': ''
         }
+
+    @property
+    def ask_vat_id(self):
+        return self.event.settings.invoice_address_vatid
+
+    @property
+    def address_required(self):
+        return self.event.settings.invoice_address_required
+
+    @property
+    def company_required(self):
+        return self.event.settings.invoice_address_company_required
 
     def __init__(self, *args, **kwargs):
         self.event = event = kwargs.pop('event')
@@ -1056,7 +1080,11 @@ class BaseInvoiceAddressForm(forms.ModelForm):
             kwargs['initial']['country'] = guess_country_from_request(self.request, self.event)
 
         super().__init__(*args, **kwargs)
-        if not event.settings.invoice_address_vatid:
+
+        self.fields["company"].widget.attrs["data-display-dependency"] = f'input[name="{self.add_prefix("is_business")}"][value="business"]'
+        self.fields["vat_id"].widget.attrs["data-display-dependency"] = f'input[name="{self.add_prefix("is_business")}"][value="business"]'
+
+        if not self.ask_vat_id:
             del self.fields['vat_id']
         elif self.validate_vat_id:
             self.fields['vat_id'].help_text = '<br/>'.join([
@@ -1074,7 +1102,7 @@ class BaseInvoiceAddressForm(forms.ModelForm):
         self.fields['country'].choices = CachedCountries()
         self.fields['country'].widget.attrs['data-country-information-url'] = reverse('js_helpers.states')
 
-        c = [('', pgettext_lazy('address', 'Select state'))]
+        c = [('', '---')]
         fprefix = self.prefix + '-' if self.prefix else ''
         cc = None
         if fprefix + 'country' in self.data:
@@ -1083,16 +1111,19 @@ class BaseInvoiceAddressForm(forms.ModelForm):
             cc = str(self.initial['country'])
         elif self.instance and self.instance.country:
             cc = str(self.instance.country)
+        state_label = pgettext_lazy('address', 'State')
         if cc and cc in COUNTRIES_WITH_STATE_IN_ADDRESS:
             types, form = COUNTRIES_WITH_STATE_IN_ADDRESS[cc]
             statelist = [s for s in pycountry.subdivisions.get(country_code=cc) if s.type in types]
             c += sorted([(s.code[3:], s.name) for s in statelist], key=lambda s: s[1])
+            if cc in COUNTRY_STATE_LABEL:
+                state_label = COUNTRY_STATE_LABEL[cc]
         elif fprefix + 'state' in self.data:
             self.data = self.data.copy()
             del self.data[fprefix + 'state']
 
         self.fields['state'] = forms.ChoiceField(
-            label=pgettext_lazy('address', 'State'),
+            label=state_label,
             required=False,
             choices=c,
             widget=forms.Select(attrs={
@@ -1110,13 +1141,13 @@ class BaseInvoiceAddressForm(forms.ModelForm):
             self.data = self.data.copy()
             del self.data[fprefix + 'vat_id']
 
-        if not event.settings.invoice_address_required or self.all_optional:
+        if not self.address_required or self.all_optional:
             for k, f in self.fields.items():
                 f.required = False
                 f.widget.is_required = False
                 if 'required' in f.widget.attrs:
                     del f.widget.attrs['required']
-        elif event.settings.invoice_address_company_required and not self.all_optional:
+        elif self.company_required and not self.all_optional:
             self.initial['is_business'] = True
 
             self.fields['is_business'].widget = BusinessBooleanRadio(require_business=True)
@@ -1133,11 +1164,11 @@ class BaseInvoiceAddressForm(forms.ModelForm):
             label=_('Name'),
             initial=self.instance.name_parts,
         )
-        if event.settings.invoice_address_required and not event.settings.invoice_address_company_required and not self.all_optional:
+        if self.address_required and not self.company_required and not self.all_optional:
             if not event.settings.invoice_name_required:
-                self.fields['name_parts'].widget.attrs['data-required-if'] = '#id_is_business_0'
+                self.fields['name_parts'].widget.attrs['data-required-if'] = f'input[name="{self.add_prefix("is_business")}"][value="individual"]'
             self.fields['name_parts'].widget.attrs['data-no-required-attr'] = '1'
-            self.fields['company'].widget.attrs['data-required-if'] = '#id_is_business_1'
+            self.fields['company'].widget.attrs['data-required-if'] = f'input[name="{self.add_prefix("is_business")}"][value="business"]'
 
         if not event.settings.invoice_address_beneficiary:
             del self.fields['beneficiary']
@@ -1163,12 +1194,12 @@ class BaseInvoiceAddressForm(forms.ModelForm):
             data['vat_id'] = ''
         if data.get('is_business') and not ask_for_vat_id(data.get('country')):
             data['vat_id'] = ''
-        if self.event.settings.invoice_address_required:
+        if self.address_validation and self.address_required and not self.all_optional:
             if data.get('is_business') and not data.get('company'):
                 raise ValidationError({"company": _('You need to provide a company name.')})
-            if not data.get('is_business') and not data.get('name_parts'):
+            if not data.get('is_business') and name_parts_is_empty(data.get('name_parts', {})):
                 raise ValidationError(_('You need to provide your name.'))
-            if 'street' in self.fields and not data.get('street') and not data.get('zipcode') and not data.get('city'):
+            if not data.get('street') and not data.get('zipcode') and not data.get('city'):
                 raise ValidationError({"street": _('This field is required.')})
 
         if 'vat_id' in self.changed_data or not data.get('vat_id'):
@@ -1181,7 +1212,7 @@ class BaseInvoiceAddressForm(forms.ModelForm):
 
         if all(
                 not v for k, v in data.items() if k not in ('is_business', 'country', 'name_parts')
-        ) and len(data.get('name_parts', {})) == 1:
+        ) and name_parts_is_empty(data.get('name_parts', {})):
             # Do not save the country if it is the only field set -- we don't know the user even checked it!
             self.cleaned_data['country'] = ''
 

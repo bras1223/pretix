@@ -34,10 +34,21 @@ $(function () {
                     }
                     for(var k in dependents) {
                         const options = data[k],
-                            dependent = dependents[k],
-                            visible = 'visible' in options ? options.visible : true,
-                            required = 'required' in options && options.required && isRequired && visible;
+                            dependent = dependents[k];
+                        let visible = 'visible' in options ? options.visible : true;
 
+                        if (dependent.is("[data-display-dependency]")) {
+                            const dependency = $(dependent.attr("data-display-dependency"));
+                            visible = visible && (
+                                (dependency.attr("type") === 'checkbox' || dependency.attr("type") === 'radio') ? dependency.prop('checked') : !!dependency.val()
+                            );
+                        }
+
+                        if ('label' in options) {
+                            dependent.closest(".form-group").find(".control-label").text(options.label);
+                        }
+
+                        const required = 'required' in options && options.required && isRequired && visible;
                         dependent.closest(".form-group").toggle(visible).toggleClass('required', required);
                         dependent.prop("required", required);
                     }
@@ -45,7 +56,15 @@ $(function () {
                 }).always(function() {
                     loader.hide();
                 }).fail(function(){
-                    // TODO: handle failed request
+                    // In case of errors, show everything and require nothing, we can still handle errors in backend
+                    for(var k in dependents) {
+                        const dependent = dependents[k],
+                            visible = true,
+                            required = false;
+
+                        dependent.closest(".form-group").toggle(visible).toggleClass('required', required);
+                        dependent.prop("required", required);
+                    }
                 });
             };
         dependents.state.prop("data-selected-value", dependents.state.val());
