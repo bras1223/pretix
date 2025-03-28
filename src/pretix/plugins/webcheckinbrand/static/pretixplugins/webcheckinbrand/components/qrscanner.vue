@@ -10,7 +10,7 @@ export default {
     return {
       qrCodeScanner: null,
       lastScannedCode: null, // Cache to prevent consecutive duplicates
-      clearTimeoutRef: null, // Reference to the timeout
+      lastScannedTime: null, // Track the time of the last scan
     };
   },
   methods: {
@@ -41,22 +41,23 @@ export default {
           { facingMode: "environment" }, // Use back camera
           config,
           (decodedText) => {
-            // Prevent duplicate consecutive scans
-            if (decodedText !== this.lastScannedCode) {
+            if (decodedText === this.lastScannedCode && this.lastScannedTime && Date.now() - this.lastScannedTime < 4000) {
+              // Ignore scans within 4 seconds (duplicate scan)
+              return;
+            } else if (decodedText === this.lastScannedCode && Date.now() - this.lastScannedTime >= 4000) {
+              // Same code but after 4 seconds
+              const userConfirmed = window.confirm("Je hebt deze kaart zojuist al gescand. Wil je hem opnieuw scannen?");
+              if (userConfirmed) {
+                // Emit scanned result to parent component
+                this.$emit("qr-scanned", decodedText);
+              }
+            } else {
+              // If different code or enough time has passed, process it
               this.lastScannedCode = decodedText;
+              this.lastScannedTime = Date.now(); // Update the scan time
 
               // Emit scanned result to parent component
               this.$emit("qr-scanned", decodedText);
-
-              // Clear previous timeout
-              if (this.clearTimeoutRef) {
-                clearTimeout(this.clearTimeoutRef);
-              }
-
-              // Reset lastScannedCode after 2 seconds to allow re-scanning
-              this.clearTimeoutRef = setTimeout(() => {
-                this.lastScannedCode = null;
-              }, 4000);
             }
           },
           (error) => {
@@ -71,9 +72,6 @@ export default {
   beforeDestroy() {
     if (this.qrCodeScanner) {
       this.qrCodeScanner.stop();
-    }
-    if (this.clearTimeoutRef) {
-      clearTimeout(this.clearTimeoutRef); // Clean up timeout on component destroy
     }
   },
 };

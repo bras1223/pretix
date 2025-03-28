@@ -34,6 +34,7 @@ def token_login_redirect(request, token):
             return HttpResponse(json.dumps({"error": "Token is required."}), status=400, content_type="application/json")
 
         user = User.objects.get(auth_token=token)
+        auth_logout(request)
         auth_login(request, user)
         return redirect(f'/control/event/weerter-brandslang/digitaal/webcheckin-brand/#{user.checkinlist_id}')
     except User.DoesNotExist:
