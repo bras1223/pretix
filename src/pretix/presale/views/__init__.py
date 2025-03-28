@@ -252,7 +252,7 @@ class CartMixin:
             'first_expiry': first_expiry,
             'is_ordered': bool(order),
             'combi': bool(positions and str(positions[0].item) == 'Combideal'),
-            'itemcount': sum(c.count for c in positions if not c.addon_to)
+            'itemcount': sum(c.count for c in positions if not c.addon_to),
             'current_selected_payments': [p for p in self.current_selected_payments(total) if p.get('multi_use_supported')]
         }
 
