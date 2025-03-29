@@ -1,6 +1,17 @@
 <template>
+  <div> <!-- single root -->
+    <div v-if="confirmVisible" class="confirm-overlay">
+      <div class="confirm-dialog">
+        <p class="confirm-text">Je hebt deze kaart zojuist al gescand. Wil je hem opnieuw scannen?</p>
+        <div class="confirm-actions">
+          <button class="btn btn-confirm" @click="onConfirm(true)">Ja</button>
+          <button class="btn btn-cancel" @click="onConfirm(false)">Nee</button>
+        </div>
+      </div>
+    </div>
   <div id="qr-scanner">
     <div id="reader" style="width: 100%"></div>
+  </div>
   </div>
 </template>
 
@@ -9,6 +20,8 @@ export default {
   data() {
     return {
       qrCodeScanner: null,
+      confirmVisible: false,
+      pendingDecodedText: null,
       lastScannedCode: null, // Cache to prevent consecutive duplicates
       lastScannedTime: null, // Track the time of the last scan
     };
@@ -41,15 +54,19 @@ export default {
           { facingMode: "environment" }, // Use back camera
           config,
           (decodedText) => {
-            if (decodedText === this.lastScannedCode && this.lastScannedTime && Date.now() - this.lastScannedTime < 4000) {
-              // Ignore scans within 4 seconds (duplicate scan)
+            const now = Date.now();
+
+            const isDuplicate = decodedText === this.lastScannedCode;
+            const isWithinFourSeconds = this.lastScannedTime && (now - this.lastScannedTime) < 4000;
+
+            if (isDuplicate && isWithinFourSeconds) {
               return;
-            } else if (decodedText === this.lastScannedCode && Date.now() - this.lastScannedTime >= 4000) {
-              // Same code but after 4 seconds
-              const userConfirmed = window.confirm("Je hebt deze kaart zojuist al gescand. Wil je hem opnieuw scannen?");
-              if (userConfirmed) {
-                // Emit scanned result to parent component
-                this.$emit("qr-scanned", decodedText);
+            }
+
+            if (isDuplicate && !isWithinFourSeconds) {
+              if (isDuplicate && !isWithinFourSeconds) {
+                this.pendingDecodedText = decodedText;
+                this.confirmVisible = true; // Show custom confirm modal
               }
             } else {
               // If different code or enough time has passed, process it
@@ -64,6 +81,16 @@ export default {
 
           }
       );
+    },
+    onConfirm(confirmed) {
+      if (confirmed && this.pendingDecodedText) {
+        this.lastScannedCode = this.pendingDecodedText;
+        this.lastScannedTime = Date.now();
+        this.$emit("qr-scanned", this.pendingDecodedText);
+      }
+      // Reset confirmation state
+      this.pendingDecodedText = null;
+      this.confirmVisible = false;
     },
   },
   mounted() {
