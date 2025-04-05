@@ -57,7 +57,7 @@ export default {
             const now = Date.now();
 
             const isDuplicate = decodedText === this.lastScannedCode;
-            const isWithinFourSeconds = this.lastScannedTime && (now - this.lastScannedTime) < 4000;
+            const isWithinFourSeconds = this.lastScannedTime && (now - this.lastScannedTime) < 6000;
 
             if (isDuplicate && isWithinFourSeconds) {
               return;
