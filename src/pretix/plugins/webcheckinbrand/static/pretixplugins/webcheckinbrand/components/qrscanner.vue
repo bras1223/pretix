@@ -59,7 +59,7 @@ export default {
             const isDuplicate = decodedText === this.lastScannedCode;
             const isWithinFourSeconds = this.lastScannedTime && (now - this.lastScannedTime) < 6000;
 
-            if (isDuplicate && isWithinFourSeconds) {
+            if ((isDuplicate && isWithinFourSeconds) || decodedText === this.pendingDecodedText) {
               return;
             }
 
