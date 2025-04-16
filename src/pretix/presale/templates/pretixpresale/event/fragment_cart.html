@@ -281,7 +281,7 @@
                         {% endif %}
                     </div>
                 {% endif %}
-            {% elif not request.event.is_voting %}
+            {% elif not request.event.is_voting and not request.event.is_form %}
                 <div role="cell" class="count">
                     {% if editable %}
                     <form action="{% eventurl event "presale:event.cart.remove" cart_namespace=cart_namespace|default_if_none:"" %}"
@@ -355,7 +355,7 @@
                     </div>
                 {% endif %}
             {% endif %}
-            {% if not hide_prices and not request.event.is_voting %}
+            {% if not hide_prices and not request.event.is_voting and not request.event.is_form %}
                 <div role="cell" class="totalprice price">
                     {% if event.settings.display_net_prices %}
                         <strong>{{ line.net_total|money:event.currency }}</strong>
@@ -458,7 +458,7 @@
             </div>
         {% endif %}
 
-            {% if not request.event.is_voting %}
+            {% if not request.event.is_voting and not request.event.is_form %}
             <div role="row" class="row cart-row total">
                 <div role="cell" class="product">
                     <strong>{% trans "Total" %}</strong><br>
@@ -490,7 +490,7 @@
     {% endif %}
 </div>
 
-{% if not request.event.is_voting %}
+{% if not request.event.is_voting and not request.event.is_form %}
 <div class="row">
     <div class="col-md-12">
     {% if not cart.is_ordered %}

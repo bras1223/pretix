@@ -11,13 +11,17 @@
 {% block title %}
     {% if "thanks" in request.GET or "paid" in request.GET %}
         {% if not request.event.is_voting %}
-            {% trans "Thank you!" %}
-            {% if order.status != 'p' %}
-                {% trans "Your order has been placed successfully. See below for details." %}
-            {% elif order.total == 0 %}
-                {% trans "Your order has been processed successfully! See below for details." %}
+            {% if not request.event.is_form %}
+                {% trans "Thank you!" %}
+                {% if order.status != 'p' %}
+                    {% trans "Your order has been placed successfully. See below for details." %}
+                {% elif order.total == 0 %}
+                    {% trans "Your order has been processed successfully! See below for details." %}
+                {% else %}
+                    {% trans "We successfully received your payment. See below for details." %}
+                {% endif %}
             {% else %}
-                {% trans "We successfully received your payment. See below for details." %}
+                Bedankt! We hebben je aanmelding ontvangen.
             {% endif %}
         {% else %}
             Bedânktj! Vae hebbe eur stum ontvânge.
@@ -54,7 +58,11 @@
                 </p>
             {% elif order.total == 0 %}
                 {% if not request.event.is_voting %}
-                    <p class="lead">{% trans "Your order has been processed successfully! See below for details." %}</p>
+                    {% if not request.event.is_form %}
+                        <p class="lead">{% trans "Your order has been processed successfully! See below for details." %}</p>
+                    {% else %}
+                        <p class="lead">We hebben je aanmelding ontvangen!</p>
+                    {% endif %}
                 {% else %}
                     <p class="lead">Vae hebbe eur stum ontvânge...</p>
                 {% endif %}
@@ -211,7 +219,11 @@
         <div class="panel-heading">
             <h3 class="panel-title">
                 {% if not request.event.is_voting %}
-                    {% trans "Ordered items" %}
+                    {% if not request.event.is_form %}
+                        Aanmelding
+                    {% else %}
+                        {% trans "Ordered items" %}
+                    {% endif %}
                 {% else %}
                     Eur stum
                 {% endif %}

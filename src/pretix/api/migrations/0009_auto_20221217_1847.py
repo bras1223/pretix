@@ -16,9 +16,6 @@ class Migration(migrations.Migration):
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('pretixapi', '0008_webhookcallretry'),
     ]
-    run_before = [
-        ('oauth2_provider', '0002_auto_20190406_1805'),
-    ]
 
     operations = [
         migrations.AddField(

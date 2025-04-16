@@ -9,15 +9,23 @@
 {% block content %}
 <main aria-label="{% trans "Review order" %}">
     {% if not request.event.is_voting %}
-    <h2>{% trans "Review order" %}</h2>
+        {% if not request.event.is_form %}
+        <h2>{% trans "Review order" %}</h2>
+        {%else%}
+        <h2>Aanmelding controleren</h2>
+        {%endif%}
     {%else%}
     <h2>Stum kontrolieëre</h2>
     {%endif%}
     {% include "pretixpresale/event/fragment_checkoutflow.html" %}
-    {% if not request.event.is_voting %}
+    {% if not request.event.is_voting and not request.event.is_form %}
         <p>{% trans "Please review the details below and confirm your order." %}</p>
     {%else%}
-        <p>Kontrolieërtj en versteurtj heej eur stum</p>
+        {% if not request.event.is_form %}
+            <p>Kontrolieërtj en versteurtj heej eur stum</p>
+        {%else %}
+            <p>Controleer je aanmelding</p>
+        {%endif%}
     {%endif%}
     <form method="post" data-asynctask
             data-asynctask-headline="{% trans "Please hang tight, we're finalizing your order!" %}">
@@ -26,17 +34,21 @@
             <div class="panel-heading panel-heading-flex">
                 <h3 class="panel-title">
                     {% if not request.event.is_voting %}
-                        <i class="fa fa-shopping-cart" aria-hidden="true"></i>
-                        {% trans "Your cart" %}
-                        <a href="{% eventurl request.event "presale:event.index" cart_namespace=cart_namespace|default_if_none:"" %}" class="h6">
-                        <span class="fa fa-edit" aria-hidden="true"></span>{% trans "Add or remove tickets" %}
-                        </a>
+                        {% if not request.event.is_form %}
+                            <i class="fa fa-shopping-cart" aria-hidden="true"></i>
+                            {% trans "Your cart" %}
+                            <a href="{% eventurl request.event "presale:event.index" cart_namespace=cart_namespace|default_if_none:"" %}" class="h6">
+                            <span class="fa fa-edit" aria-hidden="true"></span>{% trans "Add or remove tickets" %}
+                            </a>
+                        {%else%}
+                            Aanmelding
+                        {%endif%}
                     {%else%}
                         Eur stum
                     {%endif%}
                 </h3>
                 <span class="panel-heading-flex-gap"></span>
-                {% if not request.event.is_voting %}
+                {% if not request.event.is_voting and not request.event.is_form %}
                     <strong class="helper-display-block" id="cart-deadline-short" data-expires="{{ cart.first_expiry|date:"Y-m-d H:i:sO" }}">
                         {% if cart.minutes_left > 0 or cart.seconds_left > 0 %}
                             {{ cart.minutes_left|stringformat:"02d" }}:{{ cart.seconds_left|stringformat:"02d" }}

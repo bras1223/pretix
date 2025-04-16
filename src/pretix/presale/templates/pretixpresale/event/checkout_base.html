@@ -12,7 +12,7 @@
     {% trans "Checkout" %}
 {% endblock %}
 {% block content %}
-{% if not request.event.is_voting %}
+{% if not request.event.is_voting and not request.event.is_form %}
 <aside aria-label="{% trans "Your cart" %}">
     <details class="panel panel-default cart{% if "open_cart" not in request.GET %} sneak-peek{% endif %}" {% if "open_cart" in request.GET %}open{% endif %}>
         <summary class="panel-heading">
@@ -59,7 +59,11 @@
 {% endif %}
 <main aria-label="{% trans "Checkout" %}">
     {% if not request.event.is_voting %}
+        {% if not request.event.is_form %}
         <h2>{% trans "Checkout" %}</h2>
+        {% else %}
+        <h2>Aanmelden</h2>
+        {% endif %}
     {% else %}
         <h2>Stumme</h2>
     {% endif %}

@@ -547,10 +547,13 @@ class CartAdd(EventViewMixin, CartActionMixin, AsyncAction, View):
     known_errortypes = ['CartError']
 
     def get_success_message(self, value):
-        if not self.request.event.is_voting:
+        if not self.request.event.is_voting and not self.request.event.is_form:
             return _('The products have been successfully added to your cart.')
-        else:
+        if self.request.event.is_form:
+            return _('Vul hier onder je gegevens in.')
+        if self.request.event.is_voting:
             return _('Gae moogtj stumme! Vultj heej eur emailadres en top dri-j in.')
+
 
 
     def _ajax_response_data(self):

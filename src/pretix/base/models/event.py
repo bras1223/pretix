@@ -603,6 +603,9 @@ class Event(EventMixin, LoggedModel):
     is_voting = models.BooleanField(default=False,
                                         verbose_name=_("Voting"),
                                         help_text=_("If selected, this event will be adapted for voting. This will remove all pricing-references"))
+    is_form = models.BooleanField(default=False,
+                                            verbose_name=_("Form"),
+                                            help_text=_("If selected, this event will be adapted as form. This will remove all pricing-references"))
     presale_end = models.DateTimeField(
         null=True, blank=True,
         verbose_name=_("End of presale"),

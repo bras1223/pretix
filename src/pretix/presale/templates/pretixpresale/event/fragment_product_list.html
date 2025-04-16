@@ -171,7 +171,7 @@
                                         <p>
                                     {% elif not var.display_price.gross %}
                                         {% if not item.mandatory_priced_addons or var.original_price %}
-                                            <span class="text-uppercase">{% trans "free" context "price" %}</span>
+                                            <span class="text-uppercase">{% trans "free" context "prices" %}</span>
                                         {% endif %}
                                     {% elif event.settings.display_net_prices %}
                                         {{ var.display_price.net|money:event.currency }}
@@ -323,7 +323,7 @@
                             </div>
                             <p>
                         {% elif not item.display_price.gross %}
-                            {% if not item.mandatory_priced_addons or item.original_price %}
+                            {% if not item.mandatory_priced_addons and not request.event.is_form or item.original_price%}
                                 <span class="text-uppercase">{% trans "free" context "price" %}</span>
                             {% endif %}
                         {% elif event.settings.display_net_prices %}
