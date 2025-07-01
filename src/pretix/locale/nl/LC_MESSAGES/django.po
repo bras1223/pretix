@@ -703,7 +703,7 @@ msgstr ""
 #: pretix/base/context.py:48
 #, python-brace-format
 msgid "<a {a_attr}>powered by {name} based on pretix</a>"
-msgstr "<a {a_attr}>medemogelijk gemaakt door {name} gebasseerd op pretix</a>"
+msgstr "<a {a_attr}>medemogelijk gemaakt door {name} gebaseerd op pretix</a>"
 
 #: pretix/base/context.py:55
 #, python-format
