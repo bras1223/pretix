@@ -58,6 +58,7 @@ from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
+from django.utils.text import format_lazy
 from django.utils.timezone import get_current_timezone
 from django.utils.translation import gettext_lazy as _, pgettext_lazy
 from django_countries import countries
@@ -181,10 +182,15 @@ class NamePartsWidget(forms.MultiWidget):
                     if self.field.required:
                         these_attrs['required'] = 'required'
                     these_attrs.pop('data-no-required-attr', None)
-                these_attrs['autocomplete'] = (self.attrs.get('autocomplete', '') + ' ' + self.autofill_map.get(self.scheme['fields'][i][0], 'off')).strip()
+
+                autofill_section = self.attrs.get('autocomplete', '')
+                autofill_by_name_scheme = self.autofill_map.get(self.scheme['fields'][i][0], 'off')
+                if autofill_by_name_scheme == "off" or autofill_section.strip() == "off":
+                    these_attrs['autocomplete'] = "off"
+                else:
+                    these_attrs['autocomplete'] = (autofill_section + ' ' + autofill_by_name_scheme).strip()
                 these_attrs['data-size'] = self.scheme['fields'][i][2]
-                if len(self.widgets) > 1:
-                    these_attrs['aria-label'] = self.scheme['fields'][i][1]
+                these_attrs['aria-label'] = self.scheme['fields'][i][1]
             else:
                 these_attrs = final_attrs
             output.append(widget.render(name + '_%s' % i, widget_value, these_attrs, renderer=renderer))
@@ -302,7 +308,10 @@ class WrappedPhonePrefixSelect(Select):
                     self.initial = "+%d" % prefix
                     break
         choices += get_phone_prefixes_sorted_and_localized()
-        super().__init__(choices=choices, attrs={'aria-label': pgettext_lazy('phonenumber', 'International area code')})
+        super().__init__(choices=choices, attrs={
+            'aria-label': pgettext_lazy('phonenumber', 'International area code'),
+            'autocomplete': 'tel-country-code',
+        })
 
     def render(self, name, value, *args, **kwargs):
         return super().render(name, value or self.initial, *args, **kwargs)
@@ -325,11 +334,11 @@ class WrappedPhonePrefixSelect(Select):
 class WrappedPhoneNumberPrefixWidget(PhoneNumberPrefixWidget):
 
     def __init__(self, attrs=None, initial=None):
-        attrs = {
-            'aria-label': pgettext_lazy('phonenumber', 'Phone number (without international area code)')
-        }
-        widgets = (WrappedPhonePrefixSelect(initial), forms.TextInput(attrs=attrs))
-        super(PhoneNumberPrefixWidget, self).__init__(widgets, attrs)
+        widgets = (WrappedPhonePrefixSelect(initial), forms.TextInput(attrs={
+            'aria-label': pgettext_lazy('phonenumber', 'Phone number (without international area code)'),
+            'autocomplete': 'tel-national',
+        }))
+        super(PhoneNumberPrefixWidget, self).__init__(widgets)
 
     def render(self, name, value, attrs=None, renderer=None):
         output = super().render(name, value, attrs, renderer)
@@ -870,10 +879,34 @@ class BaseQuestionsForm(forms.Form):
                     attrs['data-min'] = q.valid_date_min.isoformat()
                 if q.valid_date_max:
                     attrs['data-max'] = q.valid_date_max.isoformat()
+                if not help_text:
+                    if q.valid_date_min and q.valid_date_max:
+                        help_text = format_lazy(
+                            'Please enter a date between {min} and {max}.',
+                            min=date_format(q.valid_date_min, "SHORT_DATE_FORMAT"),
+                            max=date_format(q.valid_date_max, "SHORT_DATE_FORMAT"),
+                        )
+                    elif q.valid_date_min:
+                        help_text = format_lazy(
+                            'Please enter a date no earlier than {min}.',
+                            min=date_format(q.valid_date_min, "SHORT_DATE_FORMAT"),
+                        )
+                    elif q.valid_date_max:
+                        help_text = format_lazy(
+                            'Please enter a date no later than {max}.',
+                            max=date_format(q.valid_date_max, "SHORT_DATE_FORMAT"),
+                        )
+                if initial and initial.answer:
+                    try:
+                        _initial = dateutil.parser.parse(initial.answer).date()
+                    except dateutil.parser.ParserError:
+                        _initial = None
+                else:
+                    _initial = None
                 field = forms.DateField(
                     label=label, required=required,
                     help_text=help_text,
-                    initial=dateutil.parser.parse(initial.answer).date() if initial and initial.answer else None,
+                    initial=_initial,
                     widget=DatePickerWidget(attrs),
                 )
                 if q.valid_date_min:
@@ -881,17 +914,50 @@ class BaseQuestionsForm(forms.Form):
                 if q.valid_date_max:
                     field.validators.append(MaxDateValidator(q.valid_date_max))
             elif q.type == Question.TYPE_TIME:
+                if initial and initial.answer:
+                    try:
+                        _initial = dateutil.parser.parse(initial.answer).time()
+                    except dateutil.parser.ParserError:
+                        _initial = None
+                else:
+                    _initial = None
                 field = forms.TimeField(
                     label=label, required=required,
                     help_text=help_text,
-                    initial=dateutil.parser.parse(initial.answer).time() if initial and initial.answer else None,
+                    initial=_initial,
                     widget=TimePickerWidget(time_format=get_format_without_seconds('TIME_INPUT_FORMATS')),
                 )
             elif q.type == Question.TYPE_DATETIME:
+                if not help_text:
+                    if q.valid_datetime_min and q.valid_datetime_max:
+                        help_text = format_lazy(
+                            'Please enter a date and time between {min} and {max}.',
+                            min=date_format(q.valid_datetime_min, "SHORT_DATETIME_FORMAT"),
+                            max=date_format(q.valid_datetime_max, "SHORT_DATETIME_FORMAT"),
+                        )
+                    elif q.valid_datetime_min:
+                        help_text = format_lazy(
+                            'Please enter a date and time no earlier than {min}.',
+                            min=date_format(q.valid_datetime_min, "SHORT_DATETIME_FORMAT"),
+                        )
+                    elif q.valid_datetime_max:
+                        help_text = format_lazy(
+                            'Please enter a date and time no later than {max}.',
+                            max=date_format(q.valid_datetime_max, "SHORT_DATETIME_FORMAT"),
+                        )
+
+                if initial and initial.answer:
+                    try:
+                        _initial = dateutil.parser.parse(initial.answer).astimezone(tz)
+                    except dateutil.parser.ParserError:
+                        _initial = None
+                else:
+                    _initial = None
+
                 field = SplitDateTimeField(
                     label=label, required=required,
                     help_text=help_text,
-                    initial=dateutil.parser.parse(initial.answer).astimezone(tz) if initial and initial.answer else None,
+                    initial=_initial,
                     widget=SplitDateTimePickerWidget(
                         time_format=get_format_without_seconds('TIME_INPUT_FORMATS'),
                         min_date=q.valid_datetime_min,
@@ -952,8 +1018,19 @@ class BaseQuestionsForm(forms.Form):
                 value.initial = data.get('question_form_data', {}).get(key)
 
         for k, v in self.fields.items():
+            if isinstance(v.widget, forms.MultiWidget):
+                for w in v.widget.widgets:
+                    autocomplete = w.attrs.get('autocomplete', '')
+                    if autocomplete.strip() == "off":
+                        w.attrs['autocomplete'] = 'off'
+                    else:
+                        w.attrs['autocomplete'] = 'section-{} '.format(self.prefix) + autocomplete
             if v.widget.attrs.get('autocomplete') or k == 'attendee_name_parts':
-                v.widget.attrs['autocomplete'] = 'section-{} '.format(self.prefix) + v.widget.attrs.get('autocomplete', '')
+                autocomplete = v.widget.attrs.get('autocomplete', '')
+                if autocomplete.strip() == "off":
+                    v.widget.attrs['autocomplete'] = 'off'
+                else:
+                    v.widget.attrs['autocomplete'] = 'section-{} '.format(self.prefix) + autocomplete
 
     def clean(self):
         from pretix.base.addressvalidation import \
@@ -1181,7 +1258,11 @@ class BaseInvoiceAddressForm(forms.ModelForm):
 
         for k, v in self.fields.items():
             if v.widget.attrs.get('autocomplete') or k == 'name_parts':
-                v.widget.attrs['autocomplete'] = 'section-invoice billing ' + v.widget.attrs.get('autocomplete', '')
+                autocomplete = v.widget.attrs.get('autocomplete', '')
+                if autocomplete.strip() == "off":
+                    v.widget.attrs['autocomplete'] = 'off'
+                else:
+                    v.widget.attrs['autocomplete'] = 'section-invoice billing ' + autocomplete
 
     def clean(self):
         from pretix.base.addressvalidation import \

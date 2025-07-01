@@ -606,6 +606,7 @@ class CheckinListOrderPositionSerializer(OrderPositionSerializer):
     order__status = serializers.SlugRelatedField(read_only=True, slug_field='status', source='order')
     order__valid_if_pending = serializers.SlugRelatedField(read_only=True, slug_field='valid_if_pending', source='order')
     order__require_approval = serializers.SlugRelatedField(read_only=True, slug_field='require_approval', source='order')
+    order__locale = serializers.SlugRelatedField(read_only=True, slug_field='locale', source='order')
 
     class Meta:
         model = OrderPosition
@@ -614,7 +615,7 @@ class CheckinListOrderPositionSerializer(OrderPositionSerializer):
                   'attendee_email', 'voucher', 'tax_rate', 'tax_value', 'secret', 'addon_to', 'subevent', 'checkins',
                   'print_logs', 'downloads', 'answers', 'tax_rule', 'pseudonymization_id', 'pdf_data', 'seat',
                   'require_attention', 'order__status', 'order__valid_if_pending', 'order__require_approval',
-                  'valid_from', 'valid_until', 'blocked')
+                  'order__locale', 'valid_from', 'valid_until', 'blocked')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1598,7 +1599,7 @@ class OrderCreateSerializer(I18nAwareModelSerializer):
                                                   self.context['event'].currency)
             is_split_taxes = fee_data.pop('_split_taxes_like_products', False)
 
-            if is_split_taxes:
+            if is_split_taxes and order.total:
                 d = defaultdict(lambda: Decimal('0.00'))
                 trz = TaxRule.zero()
                 for p in pos_map.values():

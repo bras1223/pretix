@@ -175,6 +175,7 @@ class EventWizardBasicsForm(I18nModelForm):
             'presale_start',
             'presale_end',
             'location',
+            'is_remote',
             'geo_lat',
             'geo_lon',
         ]
@@ -448,6 +449,7 @@ class EventUpdateForm(I18nModelForm):
             'presale_start',
             'presale_end',
             'location',
+            'is_remote',
             'geo_lat',
             'geo_lon',
             'all_sales_channels',
@@ -665,9 +667,9 @@ class EventSettingsForm(EventSettingsValidationMixin, FormPlaceholderMixin, Sett
             del self.fields['event_list_available_only']
             del self.fields['event_list_filters']
             del self.fields['event_calendar_future_only']
-        self.fields['primary_font'].choices += [
+        self.fields['primary_font'].choices = [('Open Sans', 'Open Sans')] + sorted([
             (a, {"title": a, "data": v}) for a, v in get_fonts(self.event, pdf_support_required=False).items()
-        ]
+        ], key=lambda a: a[0])
 
         # create "virtual" fields for better UX when editing <name>_asked and <name>_required fields
         self.virtual_keys = []
@@ -761,6 +763,7 @@ class CancelSettingsForm(SettingsForm):
         'change_allow_user_addons',
         'change_allow_user_if_checked_in',
         'change_allow_attendee',
+        'tax_rule_cancellation',
     ]
 
     def __init__(self, *args, **kwargs):
@@ -783,14 +786,8 @@ class PaymentSettingsForm(EventSettingsValidationMixin, SettingsForm):
         'payment_term_accept_late',
         'payment_pending_hidden',
         'payment_explanation',
+        'tax_rule_payment',
     ]
-    tax_rate_default = forms.ModelChoiceField(
-        queryset=TaxRule.objects.none(),
-        label=_('Tax rule for payment fees'),
-        required=False,
-        help_text=_("The tax rule that applies for additional fees you configured for single payment methods. This "
-                    "will set the tax rate and reverse charge rules, other settings of the tax rule are ignored.")
-    )
 
     def clean_payment_term_days(self):
         value = self.cleaned_data.get('payment_term_days')
@@ -803,10 +800,6 @@ class PaymentSettingsForm(EventSettingsValidationMixin, SettingsForm):
         if self.cleaned_data.get('payment_term_mode') == 'minutes' and value is None:
             raise ValidationError(_("This field is required."))
         return value
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['tax_rate_default'].queryset = self.obj.tax_rules.all()
 
 
 class ProviderForm(SettingsForm):

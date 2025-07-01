@@ -50,7 +50,7 @@ def item2(event2):
 
 @pytest.fixture
 def taxrule(event):
-    return event.tax_rules.create(rate=Decimal('19.00'), code="S/standard")
+    return event.tax_rules.create(rate=Decimal('19.00'), code="S/standard", default=True)
 
 
 @pytest.fixture
@@ -1346,6 +1346,26 @@ def test_order_mark_canceled_pending(token_client, organizer, event, order):
     assert len(djmail.outbox) == 1
     with scopes_disabled():
         assert order.transactions.count() == 4
+
+
+@pytest.mark.django_db
+def test_order_mark_canceled_pending_fee_with_tax(token_client, organizer, event, order, taxrule):
+    djmail.outbox = []
+    event.settings.tax_rule_cancellation = "default"
+    resp = token_client.post(
+        '/api/v1/organizers/{}/events/{}/orders/{}/mark_canceled/'.format(
+            organizer.slug, event.slug, order.code
+        ), data={
+            'cancellation_fee': '7.00'
+        }
+    )
+    assert resp.status_code == 200
+    assert resp.data['status'] == Order.STATUS_PENDING
+    assert len(djmail.outbox) == 1
+    with scopes_disabled():
+        of = order.fees.get()
+    assert of.value == Decimal("7.00")
+    assert of.tax_rate == taxrule.rate
 
 
 @pytest.mark.django_db

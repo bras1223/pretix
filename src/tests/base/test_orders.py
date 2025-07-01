@@ -1117,7 +1117,7 @@ class OrderCancelTests(TestCase):
         self.order.save()
         self.order.payments.create(state=OrderPayment.PAYMENT_STATE_CONFIRMED, amount=48.5)
         with pytest.raises(OrderError):
-            cancel_order(self.order.pk, cancellation_fee=50)
+            cancel_order(self.order.pk, cancellation_fee=Decimal("50.00"))
         self.order.refresh_from_db()
         assert self.order.status == Order.STATUS_PAID
         assert self.order.total == 46
@@ -1131,7 +1131,7 @@ class OrderCancelTests(TestCase):
         self.order.payments.create(state=OrderPayment.PAYMENT_STATE_CONFIRMED, amount=48.5)
         self.op1.voucher = self.event.vouchers.create(item=self.ticket, redeemed=1)
         self.op1.save()
-        cancel_order(self.order.pk, cancellation_fee=2.5)
+        cancel_order(self.order.pk, cancellation_fee=Decimal("2.50"))
         self.order.refresh_from_db()
         assert self.order.status == Order.STATUS_PAID
         self.op1.refresh_from_db()
@@ -1158,7 +1158,7 @@ class OrderCancelTests(TestCase):
         self.order.payments.create(state=OrderPayment.PAYMENT_STATE_CONFIRMED, amount=48.5)
         self.op1.voucher = self.event.vouchers.create(item=self.ticket, redeemed=1)
         self.op1.save()
-        cancel_order(self.order.pk, cancellation_fee=2.5)
+        cancel_order(self.order.pk, cancellation_fee=Decimal("2.50"))
         self.order.refresh_from_db()
         assert self.order.status == Order.STATUS_PAID
         self.op1.refresh_from_db()
@@ -1172,7 +1172,7 @@ class OrderCancelTests(TestCase):
             state=OrderPayment.PAYMENT_STATE_CONFIRMED,
             provider='testdummy_partialrefund'
         )
-        cancel_order(self.order.pk, cancellation_fee=2, try_auto_refund=True)
+        cancel_order(self.order.pk, cancellation_fee=Decimal("2.00"), try_auto_refund=True)
         r = self.order.refunds.get()
         assert r.state == OrderRefund.REFUND_STATE_DONE
         assert r.amount == Decimal('44.00')
@@ -1190,7 +1190,7 @@ class OrderCancelTests(TestCase):
             provider='giftcard',
             info='{"gift_card": %d}' % gc.pk
         )
-        cancel_order(self.order.pk, cancellation_fee=2, try_auto_refund=True)
+        cancel_order(self.order.pk, cancellation_fee=Decimal("2.00"), try_auto_refund=True)
         r = self.order.refunds.get()
         assert r.state == OrderRefund.REFUND_STATE_DONE
         assert r.amount == Decimal('44.00')
@@ -1209,7 +1209,7 @@ class OrderCancelTests(TestCase):
             state=OrderPayment.PAYMENT_STATE_CONFIRMED,
             provider='testdummy_partialrefund'
         )
-        cancel_order(self.order.pk, cancellation_fee=2, try_auto_refund=True)
+        cancel_order(self.order.pk, cancellation_fee=Decimal("2.00"), try_auto_refund=True)
         r = self.order.refunds.get()
         assert r.state == OrderRefund.REFUND_STATE_DONE
         assert gc.value == Decimal('0.00')
@@ -1224,7 +1224,7 @@ class OrderCancelTests(TestCase):
             provider='testdummy_partialrefund'
         )
         with pytest.raises(OrderError):
-            cancel_order(self.order.pk, cancellation_fee=2, try_auto_refund=True)
+            cancel_order(self.order.pk, cancellation_fee=Decimal("2.00"), try_auto_refund=True)
         assert gc.value == Decimal('20.00')
 
     @classscope(attr='o')
@@ -1234,7 +1234,7 @@ class OrderCancelTests(TestCase):
             state=OrderPayment.PAYMENT_STATE_CONFIRMED,
             provider='testdummy_fullrefund'
         )
-        cancel_order(self.order.pk, cancellation_fee=2, try_auto_refund=True)
+        cancel_order(self.order.pk, cancellation_fee=Decimal("2.00"), try_auto_refund=True)
         assert not self.order.refunds.exists()
         assert self.order.all_logentries().filter(action_type='pretix.event.order.refund.requested').exists()
 
@@ -1258,7 +1258,7 @@ class OrderChangeManagerTests(TestCase):
                 provider='banktransfer', state=OrderPayment.PAYMENT_STATE_CREATED, amount=self.order.total
             )
             self.tr7 = self.event.tax_rules.create(rate=Decimal('7.00'))
-            self.tr19 = self.event.tax_rules.create(rate=Decimal('19.00'))
+            self.tr19 = self.event.tax_rules.create(rate=Decimal('19.00'), default=True)
             self.ticket = Item.objects.create(event=self.event, name='Early-bird ticket', tax_rule=self.tr7,
                                               default_price=Decimal('23.00'), admission=True)
             self.ticket2 = Item.objects.create(event=self.event, name='Other ticket', tax_rule=self.tr7,
@@ -1582,6 +1582,27 @@ class OrderChangeManagerTests(TestCase):
         assert self.order.total == self.op1.price + self.op2.price
 
     @classscope(attr='o')
+    def test_change_price_reverse_charge_success(self):
+        self._enable_reverse_charge()
+        self.op1.tax_rate = Decimal("0.00")
+        self.op1.tax_value = Decimal("0.00")
+        self.op1.tax_code = "AE"
+        self.op1.save()
+        self.op2.tax_rate = Decimal("0.00")
+        self.op2.tax_value = Decimal("0.00")
+        self.op2.tax_code = "AE"
+        self.op2.save()
+        self.ocm.change_price(self.op1, Decimal('1000.00'))
+        self.ocm.commit()
+        self.op1.refresh_from_db()
+        self.order.refresh_from_db()
+        assert self.op1.item == self.ticket
+        assert self.op1.price == Decimal('1000.00')
+        assert self.op1.tax_value == Decimal('0.00')
+        assert self.op1.tax_rate == Decimal('0.00')
+        assert self.order.total == self.op1.price + self.op2.price
+
+    @classscope(attr='o')
     def test_cancel_success(self):
         s = self.op1.secret
         self.ocm.cancel(self.op1)
@@ -1714,12 +1735,43 @@ class OrderChangeManagerTests(TestCase):
             self.ocm.change_price(self.op1, 25)
 
     @classscope(attr='o')
+    def test_cancel_and_change_addon(self):
+        se1 = self.event.subevents.create(name="Foo", date_from=now())
+        se2 = self.event.subevents.create(name="Bar", date_from=now())
+        self.op1.subevent = se1
+        self.op1.save()
+        self.op2.subevent = se1
+        self.op2.save()
+        self.quota.subevent = se2
+        self.quota.save()
+        op3 = OrderPosition.objects.create(
+            order=self.order, item=self.ticket, variation=None, addon_to=self.op1,
+            price=Decimal("0.00"), positionid=3, subevent=se1,
+        )
+
+        self.ocm.cancel(self.op1)
+        self.ocm.change_subevent(op3, se2)
+        self.ocm.commit()
+        # Expected: the addon is also canceled
+        # Bug we had: the addon is not canceled
+        op3.refresh_from_db()
+        assert op3.canceled
+
+    @classscope(attr='o')
     def test_cancel_all_in_order(self):
+        self.shirt.category = self.event.categories.create(name='Add-ons', is_addon=True)
+        self.ticket.addons.create(addon_category=self.shirt.category)
+        self.ocm.add_position(self.shirt, None, Decimal('13.00'), addon_to=self.op1)
+        self.ocm.commit()
+        self.order.refresh_from_db()
+        self.ocm = OrderChangeManager(self.order, None)
+
+        assert self.order.positions.count() == 3
         self.ocm.cancel(self.op1)
         self.ocm.cancel(self.op2)
         with self.assertRaises(OrderError):
             self.ocm.commit()
-        assert self.order.positions.count() == 2
+        assert self.order.positions.count() == 3
 
     @classscope(attr='o')
     def test_empty(self):
@@ -1816,7 +1868,6 @@ class OrderChangeManagerTests(TestCase):
 
     @classscope(attr='o')
     def test_payment_fee_calculation(self):
-        self.event.settings.set('tax_rate_default', self.tr19.pk)
         prov = self.ocm._get_payment_provider()
         prov.settings.set('_fee_abs', Decimal('0.30'))
         self.ocm.change_price(self.op1, Decimal('24.00'))
@@ -1830,7 +1881,6 @@ class OrderChangeManagerTests(TestCase):
 
     @classscope(attr='o')
     def test_pending_free_order_stays_pending(self):
-        self.event.settings.set('tax_rate_default', self.tr19.pk)
         self.ocm.change_price(self.op1, Decimal('0.00'))
         self.ocm.change_price(self.op2, Decimal('0.00'))
         self.ocm.commit()
@@ -1988,6 +2038,22 @@ class OrderChangeManagerTests(TestCase):
         nop = self.order.positions.last()
         assert nop.item == self.shirt
         assert nop.price == Decimal('10.08')
+        assert nop.tax_rate == Decimal('0.00')
+        assert nop.tax_value == Decimal('0.00')
+        assert self.order.total == self.op1.price + self.op2.price + nop.price
+        assert nop.positionid == 3
+        assert self.order.transactions.filter(item=self.shirt).last().tax_code == "AE"
+
+    @classscope(attr='o')
+    def test_add_item_with_price_reverse_charge(self):
+        self._enable_reverse_charge()
+        self.ocm.add_position(self.shirt, None, Decimal("1.00"), None)
+        self.ocm.commit()
+        self.order.refresh_from_db()
+        assert self.order.positions.count() == 3
+        nop = self.order.positions.last()
+        assert nop.item == self.shirt
+        assert nop.price == Decimal('1.00')
         assert nop.tax_rate == Decimal('0.00')
         assert nop.tax_value == Decimal('0.00')
         assert self.order.total == self.op1.price + self.op2.price + nop.price
@@ -2202,7 +2268,6 @@ class OrderChangeManagerTests(TestCase):
 
     @classscope(attr='o')
     def test_recalculate_country_rate(self):
-        self.event.settings.set('tax_rate_default', self.tr19.pk)
         prov = self.ocm._get_payment_provider()
         prov.settings.set('_fee_abs', Decimal('0.30'))
         self.ocm._recalculate_total_and_payment_fee()
@@ -2235,7 +2300,6 @@ class OrderChangeManagerTests(TestCase):
 
     @classscope(attr='o')
     def test_recalculate_country_rate_keep_gross(self):
-        self.event.settings.set('tax_rate_default', self.tr19.pk)
         prov = self.ocm._get_payment_provider()
         prov.settings.set('_fee_abs', Decimal('0.30'))
         self.ocm._recalculate_total_and_payment_fee()
@@ -2266,7 +2330,6 @@ class OrderChangeManagerTests(TestCase):
 
     @classscope(attr='o')
     def test_recalculate_reverse_charge(self):
-        self.event.settings.set('tax_rate_default', self.tr19.pk)
         prov = self.ocm._get_payment_provider()
         prov.settings.set('_fee_abs', Decimal('0.30'))
         self.ocm._recalculate_total_and_payment_fee()
@@ -2425,7 +2488,6 @@ class OrderChangeManagerTests(TestCase):
     @classscope(attr='o')
     def test_split_pending_payment_fees(self):
         # Set payment fees
-        self.event.settings.set('tax_rate_default', self.tr19.pk)
         prov = self.ocm._get_payment_provider()
         prov.settings.set('_fee_percent', Decimal('2.00'))
         prov.settings.set('_fee_abs', Decimal('1.00'))
@@ -2629,7 +2691,6 @@ class OrderChangeManagerTests(TestCase):
         ia = self._enable_reverse_charge()
 
         # Set payment fees
-        self.event.settings.set('tax_rate_default', self.tr19.pk)
         prov = self.ocm._get_payment_provider()
         prov.settings.set('_fee_percent', Decimal('2.00'))
         prov.settings.set('_fee_reverse_calc', False)
@@ -2723,7 +2784,6 @@ class OrderChangeManagerTests(TestCase):
     @classscope(attr='o')
     def test_split_paid_payment_fees(self):
         # Set payment fees
-        self.event.settings.set('tax_rate_default', self.tr19.pk)
         prov = self.ocm._get_payment_provider()
         prov.settings.set('_fee_percent', Decimal('2.00'))
         prov.settings.set('_fee_abs', Decimal('1.00'))
@@ -3242,6 +3302,18 @@ class OrderChangeManagerTests(TestCase):
         assert nop.tax_rule == self.tr19
         assert nop.tax_rate == Decimal('0.00')
         assert nop.tax_value == Decimal('0.00')
+
+    @classscope(attr='o')
+    def test_change_taxrate_and_keep_net(self):
+        self.ocm.change_tax_rule(self.op1, self.tr19)
+        self.ocm.recalculate_taxes(keep='net')
+        self.ocm.commit()
+        self.order.refresh_from_db()
+        nop = self.order.positions.first()
+        assert nop.price == Decimal('25.59')
+        assert nop.tax_rule == self.tr19
+        assert nop.tax_rate == Decimal('19.00')
+        assert nop.tax_value == Decimal('4.09')
 
     @classscope(attr='o')
     def test_change_taxrate_to_country_specific(self):

@@ -793,7 +793,7 @@ class Item(LoggedModel):
     class Meta:
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
-        ordering = ("category__position", "category", "position")
+        ordering = ("category__position", "category", "position", "pk")
 
     def __str__(self):
         return str(self.internal_name or self.name)
@@ -821,7 +821,8 @@ class Item(LoggedModel):
     def ask_attendee_data(self):
         return self.admission and self.personalized
 
-    def tax(self, price=None, base_price_is='auto', currency=None, invoice_address=None, override_tax_rate=None, include_bundled=False):
+    def tax(self, price=None, base_price_is='auto', currency=None, invoice_address=None, override_tax_rate=None,
+            include_bundled=False, force_fixed_gross_price=False):
         price = price if price is not None else self.default_price
 
         bundled_sum = Decimal('0.00')
@@ -850,7 +851,7 @@ class Item(LoggedModel):
         else:
             t = self.tax_rule.tax(price, base_price_is=base_price_is, invoice_address=invoice_address,
                                   override_tax_rate=override_tax_rate, currency=currency or self.event.currency,
-                                  subtract_from_gross=bundled_sum)
+                                  subtract_from_gross=bundled_sum, force_fixed_gross_price=force_fixed_gross_price)
 
         if bundled_sum:
             t.name = "MIXED!"
@@ -1841,7 +1842,7 @@ class Question(LoggedModel):
                 ))
                 llen = len(answer.split(','))
             elif all(isinstance(o, QuestionOption) for o in answer):
-                return o
+                return answer
             else:
                 l_ = list(self.options.filter(
                     Q(pk__in=[a for a in answer if isinstance(a, int) or a.isdigit()]) |
@@ -1919,6 +1920,34 @@ class Question(LoggedModel):
         for item in items:
             if event != item.event:
                 raise ValidationError(_('One or more items do not belong to this event.'))
+
+    def clean(self):
+        if self.valid_date_max and self.valid_date_min and self.valid_date_min > self.valid_date_max:
+            raise ValidationError(_("The maximum date must not be before the minimum value."))
+        if self.valid_datetime_max and self.valid_datetime_min and self.valid_datetime_min > self.valid_datetime_max:
+            raise ValidationError(_("The maximum date must not be before the minimum value."))
+        if self.valid_number_max and self.valid_number_min and self.valid_number_min > self.valid_number_max:
+            raise ValidationError(_("The maximum value must not be lower than the minimum value."))
+        super().clean()
+
+    def clean_type_change(self, old_type, new_type):
+        if old_type == new_type:
+            return True
+        if not self.pk or not self.answers.exists():
+            return True
+        if new_type == self.TYPE_TEXT and old_type != self.TYPE_FILE:
+            # All types can be converted to text except file
+            return True
+        if new_type == self.TYPE_STRING and old_type not in (self.TYPE_TEXT, self.TYPE_FILE):
+            # All types can be converted to string except text or file
+            return True
+        if new_type == self.TYPE_CHOICE_MULTIPLE and old_type == self.TYPE_CHOICE:
+            # Single-choice can be converted to multiple choice without loss
+            return True
+        raise ValidationError(
+            _("The system already contains answers to this question that are not compatible with changing the "
+              "type of question without data loss. Consider hiding this question and creating a new one instead.")
+        )
 
 
 class QuestionOption(models.Model):

@@ -66,11 +66,12 @@ from pretix.api.serializers.fields import (
 )
 from pretix.api.serializers.i18n import I18nURLField
 from pretix.base.forms import I18nMarkdownTextarea, I18nURLFormField
-from pretix.base.models.tax import VAT_ID_COUNTRIES, TaxRule
+from pretix.base.models.tax import VAT_ID_COUNTRIES
 from pretix.base.reldate import (
     RelativeDateField, RelativeDateTimeField, RelativeDateWrapper,
     SerializerRelativeDateField, SerializerRelativeDateTimeField,
 )
+from pretix.base.validators import multimail_validate
 from pretix.control.forms import (
     ExtFileField, FontSelect, MultipleLanguagesWidget, SingleLanguageWidget,
 )
@@ -1026,9 +1027,47 @@ DEFAULTS = {
             widget=forms.CheckboxInput,
         )
     },
-    'tax_rate_default': {
-        'default': None,
-        'type': TaxRule
+    'tax_rule_payment': {
+        'default': 'default',
+        'type': str,
+        'form_class': forms.ChoiceField,
+        'serializer_class': serializers.ChoiceField,
+        'serializer_kwargs': dict(
+            choices=(
+                ('default', _('Use default tax rate')),
+                ('none', _('Charge no taxes')),
+            ),
+        ),
+        'form_kwargs': dict(
+            label=_("Tax handling on payment fees"),
+            widget=forms.RadioSelect,
+            choices=(
+                ('default', _('Use default tax rate')),
+                ('none', _('Charge no taxes')),
+            ),
+        )
+    },
+    'tax_rule_cancellation': {
+        'default': 'none',
+        'type': str,
+        'form_class': forms.ChoiceField,
+        'serializer_class': serializers.ChoiceField,
+        'serializer_kwargs': dict(
+            choices=(
+                ('none', _('Charge no taxes')),
+                ('split', _('Use same taxes as order positions (split according to net prices)')),
+                ('default', _('Use default tax rate')),
+            ),
+        ),
+        'form_kwargs': dict(
+            label=_("Tax handling on cancellation fees"),
+            widget=forms.RadioSelect,
+            choices=(
+                ('none', _('Charge no taxes')),
+                ('split', _('Use same taxes as order positions (split according to net prices)')),
+                ('default', _('Use default tax rate')),
+            ),
+        )
     },
     'invoice_generate': {
         'default': 'False',
@@ -1233,14 +1272,18 @@ DEFAULTS = {
     'invoice_email_organizer': {
         'default': '',
         'type': str,
-        'form_class': forms.EmailField,
-        'serializer_class': serializers.EmailField,
+        'form_class': forms.CharField,
+        'serializer_class': serializers.CharField,
         'form_kwargs': dict(
             label=_("Email address to receive a copy of each invoice"),
             help_text=_("Each newly created invoice will be sent to this email address shortly after creation. You can "
                         "use this for an automated import of invoices to your accounting system. The invoice will be "
                         "the only attachment of the email."),
-        )
+            validators=[multimail_validate],
+        ),
+        'serializer_kwargs': dict(
+            validators=[multimail_validate],
+        ),
     },
     'show_items_outside_presale_period': {
         'default': 'True',
@@ -2058,6 +2101,38 @@ DEFAULTS = {
         ),
         'serializer_class': I18nURLField,
     },
+    'accessibility_url': {
+        'default': None,
+        'type': LazyI18nString,
+        'form_class': I18nURLFormField,
+        'form_kwargs': dict(
+            label=_("Accessibility information URL"),
+            help_text=_("This should point e.g. to a part of your website that explains how your ticket shop complies "
+                        "with accessibility regulation."),
+            widget=I18nTextInput,
+        ),
+        'serializer_class': I18nURLField,
+    },
+    'accessibility_title': {
+        'default': LazyI18nString.from_gettext(gettext_noop("Accessibility information")),
+        'type': LazyI18nString,
+        'form_class': I18nFormField,
+        'form_kwargs': dict(
+            label=_("Accessibility information title"),
+            widget=I18nTextInput,
+        ),
+        'serializer_class': I18nURLField,
+    },
+    'accessibility_text': {
+        'default': None,
+        'type': LazyI18nString,
+        'form_class': I18nFormField,
+        'form_kwargs': dict(
+            label=_("Accessibility information text"),
+            widget=I18nMarkdownTextarea,
+        ),
+        'serializer_class': I18nURLField,
+    },
     'confirm_texts': {
         'default': LazyI18nStringList(),
         'type': LazyI18nStringList,
@@ -2782,7 +2857,7 @@ Your {organizer} team"""))  # noqa: W291
         ),
     },
     'theme_color_success': {
-        'default': '#50a167',
+        'default': '#408252',
         'type': str,
         'form_class': forms.CharField,
         'serializer_class': serializers.CharField,
@@ -2887,7 +2962,8 @@ Your {organizer} team"""))  # noqa: W291
             ext_whitelist=settings.FILE_UPLOAD_EXTENSIONS_IMAGE,
             max_size=settings.FILE_UPLOAD_MAX_SIZE_IMAGE,
             help_text=_('If you provide a logo image, we will by default not show your event name and date '
-                        'in the page header. By default, we show your logo with a size of up to 1140x120 pixels. You '
+                        'in the page header. If you use a white background, we show your logo with a size of up '
+                        'to 1140x120 pixels. Otherwise the maximum size is 1120x120 pixels. You '
                         'can increase the size with the setting below. We recommend not using small details on the picture '
                         'as it will be resized on smaller screens.')
         ),
@@ -2930,7 +3006,8 @@ Your {organizer} team"""))  # noqa: W291
             ext_whitelist=settings.FILE_UPLOAD_EXTENSIONS_IMAGE,
             max_size=settings.FILE_UPLOAD_MAX_SIZE_IMAGE,
             help_text=_('If you provide a logo image, we will by default not show your organization name '
-                        'in the page header. By default, we show your logo with a size of up to 1140x120 pixels. You '
+                        'in the page header. If you use a white background, we show your logo with a size of up '
+                        'to 1140x120 pixels. Otherwise the maximum size is 1120x120 pixels. You '
                         'can increase the size with the setting below. We recommend not using small details on the picture '
                         'as it will be resized on smaller screens.')
         ),
@@ -3709,12 +3786,12 @@ COUNTRIES_WITH_STATE_IN_ADDRESS = {
     # are actually *used* in postal addresses. This is obviously not complete and opinionated.
     # Country: [(List of subdivision types as defined by pycountry), (short or long form to be used)]
     'AU': (['State', 'Territory'], 'short'),
-    'BR': (['State'], 'short'),
+    'BR': (['Federal district', 'State'], 'short'),
     'CA': (['Province', 'Territory'], 'short'),
     # 'CN': (['Province', 'Autonomous region', 'Munincipality'], 'long'),
     'JP': (['Prefecture'], 'long'),
     'MY': (['State', 'Federal territory'], 'long'),
-    'MX': (['State', 'Federal district'], 'short'),
+    'MX': (['State', 'Federal district', 'Federal entity'], 'short'),
     'US': (['State', 'Outlying area', 'District'], 'short'),
     'IT': (['Province', 'Free municipal consortium', 'Metropolitan city', 'Autonomous province',
             'Free municipal consortium', 'Decentralized regional entity'], 'short'),

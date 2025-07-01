@@ -64,12 +64,14 @@ from pretix.base.models import (
     Event, EventMetaValue, Organizer, Quota, SubEvent, SubEventMetaValue,
 )
 from pretix.base.services.quotas import QuotaAvailability
+from pretix.base.timemachine import time_machine_now
 from pretix.helpers.compat import date_fromisocalendar
 from pretix.helpers.daterange import daterange
 from pretix.helpers.formats.en.formats import (
     SHORT_MONTH_DAY_FORMAT, WEEK_FORMAT,
 )
 from pretix.helpers.http import redirect_to_url
+from pretix.helpers.i18n import parse_date_localized
 from pretix.helpers.thumb import get_thumbnail
 from pretix.multidomain.urlreverse import build_absolute_uri, eventreverse
 from pretix.presale.forms.organizer import EventListFilterForm
@@ -227,7 +229,7 @@ class EventListMixin:
 
     def _set_month_to_next_subevent(self):
         tz = self.request.event.timezone
-        now_dt = now()
+        now_dt = time_machine_now()
         next_sev = self.request.event.subevents.using(settings.DATABASE_REPLICA).annotate(
             effective_date=Case(
                 When(date_from__lt=now_dt, date_to__isnull=False, date_to__gte=now_dt, then=Value(now_dt)),
@@ -244,8 +246,8 @@ class EventListMixin:
             self.year = datetime_from.astimezone(tz).year
             self.month = datetime_from.astimezone(tz).month
         else:
-            self.year = now().year
-            self.month = now().month
+            self.year = now_dt.year
+            self.month = now_dt.month
 
     def _set_month_to_next_event(self):
         now_dt = now()
@@ -295,7 +297,7 @@ class EventListMixin:
             try:
                 date = dateutil.parser.isoparse(self.request.GET.get('date')).date()
             except ValueError:
-                date = now().date()
+                date = time_machine_now().date()
             self.year = date.year
             self.month = date.month
         else:
@@ -305,7 +307,7 @@ class EventListMixin:
                 self._set_month_to_next_event()
 
     def _set_week_to_next_subevent(self):
-        now_dt = now()
+        now_dt = time_machine_now()
         tz = self.request.event.timezone
         next_sev = self.request.event.subevents.using(settings.DATABASE_REPLICA).annotate(
             effective_date=Case(
@@ -323,8 +325,8 @@ class EventListMixin:
             self.year = datetime_from.astimezone(tz).isocalendar()[0]
             self.week = datetime_from.astimezone(tz).isocalendar()[1]
         else:
-            self.year = now().isocalendar()[0]
-            self.week = now().isocalendar()[1]
+            self.year = now_dt.isocalendar()[0]
+            self.week = now_dt.isocalendar()[1]
 
     def _set_week_to_next_event(self):
         now_dt = now()
@@ -374,7 +376,7 @@ class EventListMixin:
             try:
                 iso = dateutil.parser.isoparse(self.request.GET.get('date')).isocalendar()
             except ValueError:
-                iso = now().isocalendar()
+                iso = time_machine_now().isocalendar()
             self.year = iso[0]
             self.week = iso[1]
         else:
@@ -810,6 +812,7 @@ class WeekCalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
         ) + timedelta(days=1)
 
         ctx['date'] = week.monday()
+        ctx['date_to'] = week.sunday()
         ctx['before'] = before
         ctx['after'] = after
 
@@ -927,10 +930,9 @@ class DayCalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
     def _set_date(self):
         if 'date' in self.request.GET:
             self.tz = self.request.organizer.timezone
-            try:
-                self.date = dateutil.parser.parse(self.request.GET.get('date')).date()
-            except ValueError:
-                self.date = now().astimezone(self.tz).date()
+            self.date = (
+                parse_date_localized(self.request.GET.get('date')) or now().astimezone(self.tz)
+            ).date()
         else:
             self._set_date_to_next_event()
 
@@ -1311,3 +1313,14 @@ class OrganizerFavicon(View):
 class RedirectToOrganizerIndex(View):
     def get(self, *args, **kwargs):
         return redirect_to_url(build_absolute_uri(self.request.organizer, "presale:organizer.index"))
+
+
+class AccessibilityView(OrganizerViewMixin, EventListMixin, TemplateView):
+    template_name = 'pretixpresale/organizers/accessibility.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if self.request.organizer.settings.accessibility_url:
+            raise Http404()
+        if not self.request.organizer.settings.accessibility_text:
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)

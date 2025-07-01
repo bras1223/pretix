@@ -59,7 +59,7 @@
         </form>
     </div>
 
-    <div class="row" id="question-stats">
+    <div class="row">
         {% if not stats %}
             <div class="empty-collection col-md-10 col-xs-12">
                 <p>
@@ -81,7 +81,7 @@
                 <div class="chart" id="question_chart" data-type="{{ question.type }}">
 
                 </div>
-                <script type="application/json" id="question-chart-data">{{ stats_json|escapejson }}</script>
+                {{ stats|json_script:"question-chart-data" }}
             </div>
             <div class="col-md-5 col-xs-12">
                 <table class="table table-bordered table-hover">
@@ -89,7 +89,8 @@
                     <tr>
                         <th>{% trans "Answer" %}</th>
                         <th class="text-right">{% trans "Count" %}</th>
-                        <th class="text-right">{% trans "Percentage" %}</th>
+                        <th class="text-right">{% trans "% of answers" %}</th>
+                        <th class="text-right">{% trans "% of tickets" %}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -102,6 +103,7 @@
                             </td>
                             <td class="text-right">{{ stat.count }}</td>
                             <td class="text-right">{{ stat.percentage|floatformat:1 }} %</td>
+                            <td class="text-right">{{ stat.percentage_attendees|floatformat:1 }} %</td>
                         </tr>
                     {% endfor %}
                     </tbody>
@@ -109,6 +111,7 @@
                         <tr>
                             <td><strong>{% trans "Sum" %}</strong></td>
                             <td class="text-right"><strong>{{ total }}</strong></td>
+                            <td></td>
                             <td></td>
                         </tr>
                     </tfoot>

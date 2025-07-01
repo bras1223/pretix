@@ -81,15 +81,22 @@ logger = logging.getLogger(__name__)
 # we never change static source without restart, so we can cache this thread-wise
 _source_cache_key = None
 
+version_min = 2
+version_max = 2
+version_default = 2  # used for output in widget-embed-code
 
-def _get_source_cache_key():
+
+def _get_source_cache_key(version):
     global _source_cache_key
     checksum = hashlib.sha256()
     if not _source_cache_key:
         with open(finders.find("pretixbase/scss/_theme_variables.scss"), "r") as f:
             checksum.update(f.read().encode())
-        tpl = get_template('pretixpresale/widget_dummy.html')
-        et = html.fromstring(tpl.render({})).xpath('/html/head/link')[0].attrib['href'].replace(settings.STATIC_URL, '')
+
+        template_path = 'pretixpresale/widget_dummy.html' if version == version_max else 'pretixpresale/widget_dummy.v{}.html'.format(version)
+
+        tpl = get_template(template_path)
+        et = html.fromstring(tpl.render()).xpath('/html/head/link')[0].attrib['href'].replace(settings.STATIC_URL, '')
         checksum.update(et.encode())
         _source_cache_key = checksum.hexdigest()[:12]
     return _source_cache_key
@@ -99,34 +106,42 @@ def indent(s):
     return s.replace('\n', '\n  ')
 
 
-def widget_css_etag(request, **kwargs):
+def widget_css_etag(request, version, **kwargs):
+    if version < version_min:
+        version = version_min
     # This makes sure a new version of the theme is loaded whenever settings or the source files have changed
     if hasattr(request, 'event'):
-        return (f'{_get_source_cache_key()}-'
+        return (f'{_get_source_cache_key(version)}-'
                 f'{request.organizer.cache.get_or_set("css_version", default=lambda: int(time.time()))}-'
                 f'{request.event.cache.get_or_set("css_version", default=lambda: int(time.time()))}')
     else:
-        return f'{_get_source_cache_key()}-{request.organizer.cache.get_or_set("css_version", default=lambda: int(time.time()))}'
+        return f'{_get_source_cache_key(version)}-{request.organizer.cache.get_or_set("css_version", default=lambda: int(time.time()))}'
 
 
-def widget_js_etag(request, lang, **kwargs):
+def widget_js_etag(request, version, lang, **kwargs):
     gs = GlobalSettingsObject()
-    return gs.settings.get('widget_checksum_{}'.format(lang))
+    return gs.settings.get('widget_checksum_{}_{}'.format(version, lang))
 
 
 @gzip_page
 @condition(etag_func=widget_css_etag)
 @cache_page(60)
-def widget_css(request, **kwargs):
+def widget_css(request, version, **kwargs):
+    if version > version_max:
+        raise Http404()
+    if version < version_min:
+        version = version_min
     o = getattr(request, 'event', request.organizer)
 
-    tpl = get_template('pretixpresale/widget_dummy.html')
-    et = html.fromstring(tpl.render({})).xpath('/html/head/link')[0].attrib['href'].replace(settings.STATIC_URL, '')
+    template_path = 'pretixpresale/widget_dummy.html' if version == version_max else 'pretixpresale/widget_dummy.v{}.html'.format(version)
+
+    tpl = get_template(template_path)
+    et = html.fromstring(tpl.render()).xpath('/html/head/link')[0].attrib['href'].replace(settings.STATIC_URL, '')
     with open(finders.find(et), 'r') as f:
         widget_css = f.read()
 
     theme_css = get_theme_vars_css(o, widget=True)
-    css = theme_css + widget_css
+    css = f"/* v{version} */\n" + theme_css + widget_css
 
     resp = FileResponse(css, content_type='text/css')
     resp._csp_ignore = True
@@ -134,7 +149,7 @@ def widget_css(request, **kwargs):
     return resp
 
 
-def generate_widget_js(lang):
+def generate_widget_js(version, lang):
     code = []
     with language(lang):
         # Provide isolation
@@ -169,7 +184,7 @@ def generate_widget_js(lang):
             'vuejs/vue.js' if settings.DEBUG else 'vuejs/vue.min.js',
             'pretixpresale/js/widget/docready.js',
             'pretixpresale/js/widget/floatformat.js',
-            'pretixpresale/js/widget/widget.js',
+            'pretixpresale/js/widget/widget.js' if version == version_max else 'pretixpresale/js/widget/widget.v{}.js'.format(version),
         ]
         for fname in files:
             f = finders.find(fname)
@@ -183,16 +198,19 @@ def generate_widget_js(lang):
             code.append('})({});\n')
     code = ''.join(code)
     code = rJSMinFilter(content=code).output()
-    return code
+    return f"/* v{version} */\n" + code
 
 
 @gzip_page
 @condition(etag_func=widget_js_etag)
-def widget_js(request, lang, **kwargs):
-    if lang not in [lc for lc, ll in settings.LANGUAGES]:
+def widget_js(request, version, lang, **kwargs):
+    if version > version_max or lang not in [lc for lc, ll in settings.LANGUAGES]:
         raise Http404()
 
-    cached_js = cache.get('widget_js_data_{}'.format(lang))
+    if version < version_min:
+        version = version_min
+
+    cached_js = cache.get('widget_js_data_v{}_{}'.format(version, lang))
     if cached_js and not settings.DEBUG:
         resp = HttpResponse(cached_js, content_type='text/javascript')
         resp._csp_ignore = True
@@ -200,7 +218,7 @@ def widget_js(request, lang, **kwargs):
         return resp
 
     gs = GlobalSettingsObject()
-    fname = gs.settings.get('widget_file_{}'.format(lang))
+    fname = gs.settings.get('widget_file_v{}_{}'.format(version, lang))
     resp = None
     if fname and not settings.DEBUG:
         if isinstance(fname, File):
@@ -208,21 +226,21 @@ def widget_js(request, lang, **kwargs):
         try:
             data = default_storage.open(fname).read()
             resp = HttpResponse(data, content_type='text/javascript')
-            cache.set('widget_js_data_{}'.format(lang), data, 3600 * 4)
+            cache.set('widget_js_data_v{}_{}'.format(version, lang), data, 3600 * 4)
         except:
             logger.exception('Failed to open widget.js')
 
     if not resp:
-        data = generate_widget_js(lang).encode()
+        data = generate_widget_js(version, lang).encode()
         checksum = hashlib.sha1(data).hexdigest()
         if not settings.DEBUG:
             newname = default_storage.save(
-                'widget/widget.{}.{}.js'.format(lang, checksum),
+                'widget/widget.{}.{}.{}.js'.format(version, lang, checksum),
                 ContentFile(data)
             )
-            gs.settings.set('widget_file_{}'.format(lang), 'file://' + newname)
-            gs.settings.set('widget_checksum_{}'.format(lang), checksum)
-            cache.set('widget_js_data_{}'.format(lang), data, 3600 * 4)
+            gs.settings.set('widget_file_v{}_{}'.format(version, lang), 'file://' + newname)
+            gs.settings.set('widget_checksum_v{}_{}'.format(version, lang), checksum)
+            cache.set('widget_js_data_v{}_{}'.format(version, lang), data, 3600 * 4)
         resp = HttpResponse(data, content_type='text/javascript')
     resp._csp_ignore = True
     resp['Access-Control-Allow-Origin'] = '*'

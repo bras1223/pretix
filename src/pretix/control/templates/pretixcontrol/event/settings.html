@@ -63,6 +63,7 @@
                 {% bootstrap_field sform.locale layout="control" %}
                 {% bootstrap_field sform.timezone layout="control" %}
                 {% bootstrap_field sform.region layout="control" %}
+                {% bootstrap_field form.is_remote layout="control" %}
             </fieldset>
             <fieldset>
                 <legend>{% trans "Customer and attendee data" %}</legend>
@@ -248,6 +249,17 @@
                 {% bootstrap_field sform.show_variations_expanded layout="control" %}
                 {% bootstrap_field sform.hide_sold_out layout="control" %}
 
+                <div data-display-dependency="#id_settings-waiting_list_enabled">
+                    <div data-display-dependency="#id_settings-hide_sold_out">
+                        <div class="alert alert-danger dynamic">
+                            <h4>{% trans "Incompatible settings" %}</h4>
+                            {% blocktrans trimmed %}
+                                Customers won't be able to add themselves to the waiting list, because "Hide all products that are sold out" is enabled.
+                            {% endblocktrans %}
+                        </div>
+                    </div>
+                </div>
+
                 <h4>{% trans "Calendar and list views" context "subevents" %}</h4>
                 {% if sform.frontpage_subevent_ordering %}
                     {% bootstrap_field sform.frontpage_subevent_ordering layout="control" %}
@@ -373,6 +385,16 @@
                     </strong>
                 </div>
                 {% bootstrap_field sform.waiting_list_enabled layout="control" %}
+                <div data-display-dependency="#id_settings-hide_sold_out">
+                    <div data-display-dependency="#id_settings-waiting_list_enabled">
+                        <div class="alert alert-danger dynamic">
+                            <h4>{% trans "Incompatible settings" %}</h4>
+                            {% blocktrans trimmed %}
+                                Customers won't be able to add themselves to the waiting list, because "Hide all products that are sold out" is enabled.
+                            {% endblocktrans %}
+                        </div>
+                    </div>
+                </div>
                 {% bootstrap_field sform.waiting_list_auto layout="control" %}
                 <div class="form-group">
                     <label class="control-label col-md-3">

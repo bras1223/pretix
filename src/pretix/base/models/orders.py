@@ -2373,17 +2373,17 @@ class OrderFee(models.Model):
             self.fee_type, self.value
         )
 
-    def _calculate_tax(self, tax_rule=None):
+    def _calculate_tax(self, tax_rule=None, invoice_address=None):
         if tax_rule:
             self.tax_rule = tax_rule
 
         try:
-            ia = self.order.invoice_address
+            ia = invoice_address or self.order.invoice_address
         except InvoiceAddress.DoesNotExist:
             ia = None
 
-        if not self.tax_rule and self.fee_type == "payment" and self.order.event.settings.tax_rate_default:
-            self.tax_rule = self.order.event.settings.tax_rate_default
+        if not self.tax_rule and self.fee_type == "payment" and self.order.event.settings.tax_rule_payment == "default":
+            self.tax_rule = self.order.event.cached_default_tax_rule
 
         if self.tax_rule:
             tax = self.tax_rule.tax(self.value, base_price_is='gross', invoice_address=ia, force_fixed_gross_price=True)
@@ -3098,7 +3098,10 @@ class CartPosition(AbstractPosition):
         verbose_name=_("Expiration date"),
         db_index=True
     )
-
+    max_extend = models.DateTimeField(
+        verbose_name=_("Limit for extending expiration date"),
+        null=True
+    )
     tax_rate = models.DecimalField(
         max_digits=7, decimal_places=2, default=Decimal('0.00'),
         verbose_name=_('Tax rate')

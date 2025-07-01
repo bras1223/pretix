@@ -201,6 +201,12 @@ class QuestionForm(I18nModelForm):
 
         return val
 
+    def clean_type(self):
+        val = self.cleaned_data.get('type')
+        if self.instance:
+            self.instance.clean_type_change(self.instance.type, val)
+        return val
+
     def clean_identifier(self):
         val = self.cleaned_data.get('identifier')
         Question._clean_identifier(self.instance.event, val, self.instance)
@@ -401,7 +407,6 @@ class ItemCreateForm(I18nModelForm):
 
         self.fields['tax_rule'].queryset = self.instance.event.tax_rules.all()
         change_decimal_field(self.fields['default_price'], self.instance.event.currency)
-        self.fields['tax_rule'].empty_label = _('No taxation')
         self.fields['copy_from'] = forms.ModelChoiceField(
             label=_("Copy product information"),
             queryset=self.event.items.all(),
@@ -411,6 +416,8 @@ class ItemCreateForm(I18nModelForm):
         )
         if self.event.tax_rules.exists():
             self.fields['tax_rule'].required = True
+        else:
+            self.fields['tax_rule'].empty_label = _('No taxation')
 
         if not self.event.has_subevents:
             choices = [

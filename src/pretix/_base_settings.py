@@ -102,6 +102,7 @@ ALL_LANGUAGES = [
     ('fi', _('Finnish')),
     ('gl', _('Galician')),
     ('el', _('Greek')),
+    ('he', _('Hebrew')),
     ('id', _('Indonesian')),
     ('it', _('Italian')),
     ('ja', _('Japanese')),
@@ -122,7 +123,8 @@ LANGUAGES_OFFICIAL = {
     'en', 'de', 'de-informal'
 }
 LANGUAGES_RTL = {
-    'ar', 'hw'
+    # When adding more right-to-left languages, also update pretix/static/pretixbase/scss/_rtl.scss
+    'ar', 'he'
 }
 LANGUAGES_INCUBATING = {
     'pt-br', 'gl',

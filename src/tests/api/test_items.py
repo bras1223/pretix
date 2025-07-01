@@ -1901,10 +1901,11 @@ TEST_QUOTA_RES = {
 
 
 @pytest.mark.django_db
-def test_quota_list(token_client, organizer, event, quota, item, subevent):
+def test_quota_list(token_client, organizer, event, quota, item, item3, subevent):
+    quota.items.add(item3)
     res = dict(TEST_QUOTA_RES)
     res["id"] = quota.pk
-    res["items"] = [item.pk]
+    res["items"] = [item.pk, item3.pk]
 
     resp = token_client.get('/api/v1/organizers/{}/events/{}/quotas/'.format(organizer.slug, event.slug))
     assert resp.status_code == 200
@@ -1920,6 +1921,13 @@ def test_quota_list(token_client, organizer, event, quota, item, subevent):
         se2 = event.subevents.create(name="Foobar", date_from=datetime(2017, 12, 27, 10, 0, 0, tzinfo=timezone.utc))
     resp = token_client.get(
         '/api/v1/organizers/{}/events/{}/quotas/?subevent={}'.format(organizer.slug, event.slug, se2.pk))
+    assert [] == resp.data['results']
+
+    resp = token_client.get(
+        '/api/v1/organizers/{}/events/{}/quotas/?items__in={},{},0'.format(organizer.slug, event.slug, item.pk, item3.pk))
+    assert [res] == resp.data['results']
+    resp = token_client.get(
+        '/api/v1/organizers/{}/events/{}/quotas/?items__in=0'.format(organizer.slug, event.slug))
     assert [] == resp.data['results']
 
 
@@ -2418,6 +2426,45 @@ def test_question_update(token_client, organizer, event, question):
         question = Question.objects.get(pk=resp.data['id'])
     assert question.question == "What's your shoe size?"
     assert question.type == "N"
+
+
+@pytest.mark.django_db
+def test_question_update_type_changes(token_client, organizer, event, question):
+    # Allowed because no answers exist
+    resp = token_client.patch(
+        '/api/v1/organizers/{}/events/{}/questions/{}/'.format(organizer.slug, event.slug, question.pk),
+        {
+            "type": "B",
+        },
+        format='json'
+    )
+    assert resp.status_code == 200
+
+    with scopes_disabled():
+        question.answers.create(answer="12")
+
+    # Allowed change
+    resp = token_client.patch(
+        '/api/v1/organizers/{}/events/{}/questions/{}/'.format(organizer.slug, event.slug, question.pk),
+        {
+            "type": "S",
+        },
+        format='json'
+    )
+    assert resp.status_code == 200
+
+    # Forbidden change
+    resp = token_client.patch(
+        '/api/v1/organizers/{}/events/{}/questions/{}/'.format(organizer.slug, event.slug, question.pk),
+        {
+            "type": "B",
+        },
+        format='json'
+    )
+    assert resp.status_code == 400
+    assert resp.content.decode() == ('{"type":["The system already contains answers to this question that are not '
+                                     'compatible with changing the type of question without data loss. Consider hiding '
+                                     'this question and creating a new one instead."]}')
 
 
 @pytest.mark.django_db
