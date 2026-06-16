@@ -119,11 +119,19 @@ class ScheduledMail(models.Model):
             canceled=False,
         )
 
-        if self.subevent:
+        if self.subevent_id:
             filter_orders_by_op = True
-            op_qs = op_qs.filter(subevent=self.subevent)
-        elif e.has_subevents:
-            return  # This rule should not even exist
+            op_qs = op_qs.filter(subevent_id=self.subevent_id)
+        elif e.has_subevents and (self.rule.date_is_absolute or self.rule.offset_relative_to_subevent):
+            if self.rule.subevent_id:
+                filter_orders_by_op = True
+                op_qs = op_qs.filter(subevent_id=self.rule.subevent_id)
+            else:
+                self.rule.sync_scheduled_mails()
+                raise ValueError("Scheduled mail for event series is missing its subevent assignment")
+        elif self.rule.subevent_id:
+            filter_orders_by_op = True
+            op_qs = op_qs.filter(subevent=self.rule.subevent_id)
 
         if not self.rule.all_products:
             filter_orders_by_op = True
@@ -189,9 +197,15 @@ class ScheduledMail(models.Model):
                         positions = [p for p in positions if p.item_id in limit_products]
                     if self.subevent_id:
                         positions = [p for p in positions if p.subevent_id == self.subevent_id]
+                    elif self.rule.subevent_id:
+                        positions = [p for p in positions if p.subevent_id == self.rule.subevent_id]
 
+                    seen_attendee_emails = set()
                     for p in positions:
                         if p.attendee_email and (p.attendee_email != o.email or not o_sent):
+                            if p.attendee_email in seen_attendee_emails:
+                                continue
+                            seen_attendee_emails.add(p.attendee_email)
                             email_ctx = get_email_context(
                                 event=e,
                                 order=o,
@@ -271,6 +285,14 @@ class Rule(models.Model, LoggingMixin):
     date_is_absolute = models.BooleanField(default=True, blank=True)
     offset_to_event_end = models.BooleanField(default=False, blank=True)  # no verbose name because not actually
     offset_is_after = models.BooleanField(default=False, blank=True)      # displayed in any forms
+    offset_relative_to_subevent = models.BooleanField(
+        default=True,
+        verbose_name=_('Schedule relative to individual event dates'),
+        help_text=_(
+            'If enabled, a separate email is scheduled for each event date based on that date. '
+            'If disabled, one email is scheduled relative to the main event date.'
+        ),
+    )
 
     send_to = models.CharField(max_length=10, choices=SEND_TO_CHOICES, default=CUSTOMERS, verbose_name=_('Send email to'))
 
@@ -282,32 +304,68 @@ class Rule(models.Model, LoggingMixin):
 
     objects = ScopedManager(organizer='event__organizer')
 
-    def save(self, **kwargs):
-        is_creation = not self.pk
-        super().save(**kwargs)
+    def uses_per_subevent_scheduled_mails(self):
+        if not self.event.has_subevents or self.subevent_id:
+            return False
+        if self.date_is_absolute:
+            return True
+        return self.offset_relative_to_subevent
 
+    def sync_scheduled_mails(self, *, is_creation=False):
+        keep_states = [ScheduledMail.STATE_COMPLETED]
         create_sms = []
+
         if self.event.has_subevents:
-            if self.subevent:
-                ScheduledMail.objects.get_or_create(rule=self, subevent=self.subevent, event=self.event)
+            if self.subevent_id:
+                sm, created = ScheduledMail.objects.get_or_create(
+                    rule=self, subevent_id=self.subevent_id, event=self.event,
+                )
+                if created or not sm.computed_datetime:
+                    sm.recompute()
+                    sm.save(update_fields=['computed_datetime', 'last_computed', 'state'])
+            elif not self.date_is_absolute and not self.offset_relative_to_subevent:
+                sm, created = ScheduledMail.objects.get_or_create(
+                    rule=self, subevent=None, event=self.event,
+                )
+                if created or not sm.computed_datetime:
+                    sm.recompute()
+                    sm.save(update_fields=['computed_datetime', 'last_computed', 'state'])
             else:
                 for se in self.event.subevents.annotate(has_sm=Exists(ScheduledMail.objects.filter(
                         subevent=OuterRef('pk'), rule=self))).filter(has_sm=False):
                     sm = ScheduledMail(rule=self, subevent=se, event=self.event)
                     sm.recompute()
                     create_sms.append(sm)
-            ScheduledMail.objects.bulk_create(create_sms)
+                if create_sms:
+                    ScheduledMail.objects.bulk_create(create_sms)
         else:
-            ScheduledMail.objects.get_or_create(rule=self, event=self.event)
+            sm, created = ScheduledMail.objects.get_or_create(
+                rule=self, subevent=None, event=self.event,
+            )
+            if created or not sm.computed_datetime:
+                sm.recompute()
+                sm.save(update_fields=['computed_datetime', 'last_computed', 'state'])
 
         if not is_creation:
-            if self.subevent:
-                keep_states = [ScheduledMail.STATE_COMPLETED]  # we keep rules where mails have already been sent
-                ScheduledMail.objects.filter(
-                    Q(rule=self),
-                    ~Q(subevent=self.subevent),
-                    ~Q(state__in=keep_states)
-                ).delete()
+            if self.event.has_subevents:
+                if self.subevent_id:
+                    ScheduledMail.objects.filter(
+                        Q(rule=self),
+                        ~Q(subevent_id=self.subevent_id),
+                        ~Q(state__in=keep_states)
+                    ).delete()
+                elif not self.date_is_absolute and not self.offset_relative_to_subevent:
+                    ScheduledMail.objects.filter(
+                        Q(rule=self),
+                        Q(subevent__isnull=False),
+                        ~Q(state__in=keep_states)
+                    ).delete()
+                else:
+                    ScheduledMail.objects.filter(
+                        Q(rule=self),
+                        Q(subevent__isnull=True),
+                        ~Q(state__in=keep_states)
+                    ).delete()
 
             update_sms = []
             for sm in self.scheduledmail_set.prefetch_related('event').select_related('subevent'):
@@ -320,49 +378,77 @@ class Rule(models.Model, LoggingMixin):
 
             ScheduledMail.objects.bulk_update(update_sms, ['computed_datetime', 'last_computed', 'state'], 100)
 
+    def save(self, **kwargs):
+        is_creation = not self.pk
+        super().save(**kwargs)
+        self.sync_scheduled_mails(is_creation=is_creation)
+
     @property
     def human_readable_time(self):
         if self.date_is_absolute:
             d = self.send_date.astimezone(self.event.timezone)
             return _('on {date} at {time}').format(date=date_format(d, 'SHORT_DATE_FORMAT'),
                                                    time=date_format(d, 'TIME_FORMAT'))
-        else:
-            if self.offset_to_event_end:
-                if self.offset_is_after:
+
+        per_date = (
+            self.event.has_subevents
+            and self.offset_relative_to_subevent
+            and not self.subevent
+        )
+        if self.offset_to_event_end:
+            if self.offset_is_after:
+                if per_date:
+                    s = ngettext(
+                        '%(count)d day after event date end at %(time)s',
+                        '%(count)d days after event date end at %(time)s',
+                        self.send_offset_days
+                    )
+                else:
                     s = ngettext(
                         '%(count)d day after event end at %(time)s',
                         '%(count)d days after event end at %(time)s',
                         self.send_offset_days
-                    ) % {
-                        'count': self.send_offset_days,
-                        'time': date_format(self.send_offset_time, 'TIME_FORMAT')
-                    }
+                    )
+            else:
+                if per_date:
+                    s = ngettext(
+                        '%(count)d day before event date end at %(time)s',
+                        '%(count)d days before event date end at %(time)s',
+                        self.send_offset_days
+                    )
                 else:
                     s = ngettext(
                         '%(count)d day before event end at %(time)s',
                         '%(count)d days before event end at %(time)s',
                         self.send_offset_days
-                    ) % {
-                        'count': self.send_offset_days,
-                        'time': date_format(self.send_offset_time, 'TIME_FORMAT')
-                    }
+                    )
+        elif self.offset_is_after:
+            if per_date:
+                s = ngettext(
+                    '%(count)d day after event date start at %(time)s',
+                    '%(count)d days after event date start at %(time)s',
+                    self.send_offset_days
+                )
             else:
-                if self.offset_is_after:
-                    s = ngettext(
-                        '%(count)d day after event start at %(time)s',
-                        '%(count)d days after event start at %(time)s',
-                        self.send_offset_days
-                    ) % {
-                        'count': self.send_offset_days,
-                        'time': date_format(self.send_offset_time, 'TIME_FORMAT')
-                    }
-                else:
-                    s = ngettext(
-                        '%(count)d day before event start at %(time)s',
-                        '%(count)d days before event start at %(time)s',
-                        self.send_offset_days
-                    ) % {
-                        'count': self.send_offset_days,
-                        'time': date_format(self.send_offset_time, 'TIME_FORMAT')
-                    }
-            return s
+                s = ngettext(
+                    '%(count)d day after event start at %(time)s',
+                    '%(count)d days after event start at %(time)s',
+                    self.send_offset_days
+                )
+        else:
+            if per_date:
+                s = ngettext(
+                    '%(count)d day before event date start at %(time)s',
+                    '%(count)d days before event date start at %(time)s',
+                    self.send_offset_days
+                )
+            else:
+                s = ngettext(
+                    '%(count)d day before event start at %(time)s',
+                    '%(count)d days before event start at %(time)s',
+                    self.send_offset_days
+                )
+        return s % {
+            'count': self.send_offset_days,
+            'time': date_format(self.send_offset_time, 'TIME_FORMAT')
+        }

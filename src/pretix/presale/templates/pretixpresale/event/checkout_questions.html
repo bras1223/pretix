@@ -9,7 +9,6 @@
     {% if not request.event.is_voting %}
         <p>{% trans "Before we continue, we need you to answer some questions." %}</p>
     {% endif %}
-    <p>{% trans "Before we continue, we need you to answer some questions." %}</p>
     {% if profiles_data %}
         {{ profiles_data|json_script:"profiles_json" }}
     {% endif %}

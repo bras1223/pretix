@@ -69,7 +69,9 @@ def scheduled_mail_create(sender, **kwargs):
     with scope(organizer=event.organizer):
         existing_rules = ScheduledMail.objects.filter(subevent=subevent).values_list('rule_id', flat=True)
         to_create = []
-        for rule in event.sendmail_rules.filter(subevent=None).exclude(id__in=existing_rules):
+        for rule in event.sendmail_rules.filter(subevent=None).filter(
+                Q(date_is_absolute=True) | Q(offset_relative_to_subevent=True)
+        ).exclude(id__in=existing_rules):
             sm = ScheduledMail(rule=rule, event=event, subevent=subevent)
             sm.recompute()
             to_create.append(sm)
@@ -151,6 +153,12 @@ class SendmailPluginRuleLogEntryType(EventLogEntryType):
 @receiver(periodic_task)
 def sendmail_run_rules(sender, **kwargs):
     with scopes_disabled():
+        for rule in Rule.objects.filter(
+            enabled=True,
+            event__has_subevents=True,
+        ).select_related('event'):
+            rule.sync_scheduled_mails()
+
         mails = ScheduledMail.objects.all()
 
         unchanged = []

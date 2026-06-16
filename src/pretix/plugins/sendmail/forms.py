@@ -365,6 +365,30 @@ class RuleForm(FormPlaceholderMixin, I18nModelForm):
         else:
             del self.fields['subevent']
 
+        if self.event.has_subevents:
+            self.fields['schedule_relative_to'] = forms.ChoiceField(
+                label=_('Schedule relative to'),
+                choices=[
+                    ('subevent', _('Individual event dates')),
+                    ('event', _('Main event')),
+                ],
+                widget=forms.RadioSelect(attrs={
+                    'data-display-dependency': '#id_schedule_type_1,#id_schedule_type_2,#id_schedule_type_3,'
+                                               '#id_schedule_type_4',
+                }),
+                initial='subevent',
+                required=False,
+                help_text=_(
+                    'If you schedule relative to individual event dates, customers with tickets for multiple '
+                    'dates receive one email per date. If you schedule relative to the main event, each customer '
+                    'receives one email.'
+                ),
+            )
+            if instance is not None:
+                self.initial['schedule_relative_to'] = (
+                    'subevent' if instance.offset_relative_to_subevent else 'event'
+                )
+
         self.fields['limit_products'].queryset = Item.objects.filter(event=self.event)
 
         self.fields['schedule_type'] = forms.ChoiceField(
@@ -428,5 +452,15 @@ class RuleForm(FormPlaceholderMixin, I18nModelForm):
         self.instance.offset_is_after = d.get('offset_is_after', False)
         self.instance.offset_to_event_end = d.get('offset_to_event_end', False)
         self.instance.date_is_absolute = d.get('date_is_absolute', False)
+
+        if self.event.has_subevents:
+            if dia == 'abs':
+                self.instance.offset_relative_to_subevent = True
+            elif 'schedule_relative_to' in d:
+                self.instance.offset_relative_to_subevent = d['schedule_relative_to'] == 'subevent'
+            elif self.instance.pk:
+                pass  # keep existing value when field was hidden
+            else:
+                self.instance.offset_relative_to_subevent = True
 
         return d

@@ -310,6 +310,153 @@ def test_sendmail_rule_all_subevents(event_series, subevent1, subevent2, item):
 
 @pytest.mark.django_db
 @scopes_disabled()
+def test_sendmail_rule_relative_to_event_single_scheduled_mail(event_series, subevent1, subevent2):
+    rule = event_series.sendmail_rules.create(
+        date_is_absolute=False,
+        offset_is_after=False,
+        offset_relative_to_subevent=False,
+        send_offset_days=1,
+        send_offset_time=datetime.time(4, 30),
+        subject='meow',
+        template='meow meow meow',
+    )
+
+    ms = ScheduledMail.objects.filter(rule=rule)
+    assert ms.count() == 1
+    assert ms.get().subevent is None
+
+
+@pytest.mark.django_db
+@scopes_disabled()
+def test_sendmail_rule_relative_to_event_one_mail_per_order(event_series, subevent1, subevent2, item, order):
+    djmail.outbox = []
+    order.status = Order.STATUS_PAID
+    order.save()
+    order.all_positions.create(item=item, price=13, subevent=subevent1)
+    order.all_positions.create(item=item, price=13, subevent=subevent2)
+
+    event_series.sendmail_rules.create(
+        date_is_absolute=False,
+        offset_is_after=False,
+        offset_relative_to_subevent=False,
+        send_offset_days=1,
+        send_offset_time=datetime.time(0, 0),
+        send_to=Rule.CUSTOMERS,
+        subject='meow',
+        template='meow meow meow',
+    )
+
+    sendmail_run_rules(None)
+    assert len(djmail.outbox) == 1
+
+
+@pytest.mark.django_db
+@scopes_disabled()
+def test_sendmail_rule_relative_to_subevent_one_mail_per_date(event_series, subevent1, subevent2, item, order):
+    djmail.outbox = []
+    order.status = Order.STATUS_PAID
+    order.save()
+    order.all_positions.create(item=item, price=13, subevent=subevent1)
+    order.all_positions.create(item=item, price=13, subevent=subevent2)
+
+    event_series.sendmail_rules.create(
+        date_is_absolute=True,
+        send_date=dt_now - datetime.timedelta(hours=1),
+        offset_relative_to_subevent=True,
+        send_to=Rule.CUSTOMERS,
+        subject='meow',
+        template='meow meow meow',
+    )
+
+    sendmail_run_rules(None)
+    assert len(djmail.outbox) == 2
+
+
+@pytest.mark.django_db
+@scopes_disabled()
+def test_sendmail_rule_subevent_one_mail_per_attendee_per_date(event_series, subevent1, item, order):
+    djmail.outbox = []
+    order.status = Order.STATUS_PAID
+    order.save()
+    for _ in range(4):
+        order.all_positions.create(
+            item=item, price=13, subevent=subevent1, attendee_email='meow@dummy.test'
+        )
+
+    event_series.sendmail_rules.create(
+        date_is_absolute=True,
+        send_date=dt_now - datetime.timedelta(hours=1),
+        offset_relative_to_subevent=True,
+        send_to=Rule.ATTENDEES,
+        subject='meow',
+        template='meow meow meow',
+    )
+
+    sendmail_run_rules(None)
+    assert len(djmail.outbox) == 1
+
+
+@pytest.mark.django_db
+@scopes_disabled()
+def test_sendmail_rule_invalid_subevent_assignment_raises(event_series, subevent1):
+    rule = event_series.sendmail_rules.create(
+        date_is_absolute=True,
+        send_date=dt_now - datetime.timedelta(hours=1),
+        subject='meow',
+        template='meow meow meow',
+    )
+    sm = ScheduledMail.objects.create(
+        rule=rule,
+        event=event_series,
+        subevent=None,
+        computed_datetime=dt_now - datetime.timedelta(hours=1),
+    )
+
+    with pytest.raises(ValueError, match="missing its subevent assignment"):
+        sm.send()
+
+
+@pytest.mark.django_db
+@scopes_disabled()
+def test_sendmail_rule_form_absolute_save_keeps_subevent_schedules(event_series, subevent1, subevent2):
+    from pretix.plugins.sendmail.forms import RuleForm
+
+    rule = event_series.sendmail_rules.create(
+        date_is_absolute=True,
+        send_date=dt_now + datetime.timedelta(days=1),
+        subject='meow',
+        template='meow meow meow',
+        offset_relative_to_subevent=True,
+    )
+    assert ScheduledMail.objects.filter(rule=rule, subevent__isnull=False).count() == 2
+
+    send_at = dt_now + datetime.timedelta(days=2)
+    form = RuleForm(
+        data={
+            'enabled': 'on',
+            'subject_0': 'meow',
+            'template_0': 'meow meow meow',
+            'schedule_type': 'abs',
+            'send_date_0': send_at.strftime('%Y-%m-%d'),
+            'send_date_1': send_at.strftime('%H:%M'),
+            'all_products': 'on',
+            'send_to': Rule.CUSTOMERS,
+            'restrict_to_status': ['p', 'n__valid_if_pending'],
+            'checked_in_status': '',
+        },
+        instance=rule,
+        event=event_series,
+    )
+    assert form.is_valid(), form.errors
+    form.save()
+    rule.refresh_from_db()
+
+    assert rule.offset_relative_to_subevent is True
+    assert ScheduledMail.objects.filter(rule=rule, subevent__isnull=False).count() == 2
+
+
+@pytest.mark.django_db
+@scopes_disabled()
 def test_sendmail_rule_send_correct_products(event, order, item, item2):
     djmail.outbox = []
 

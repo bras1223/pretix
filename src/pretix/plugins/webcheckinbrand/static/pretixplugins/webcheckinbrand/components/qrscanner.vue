@@ -43,17 +43,15 @@ export default {
         };
       }
 
-      const config = { fps: 10, qrbox: qrboxFunction, videoConstraints: {
-          aspectRatio: 1.0,  facingMode: {
-            exact: "environment"
-          }
-        }, showTorchButtonIfSupported: true};
+      const config = {
+        fps: 10,
+        qrbox: qrboxFunction,
+        aspectRatio: 1.333334,
+        showTorchButtonIfSupported: true,
+      };
       this.qrCodeScanner = new window.Html5Qrcode("reader");
 
-      this.qrCodeScanner.start(
-          { facingMode: "environment" }, // Use back camera
-          config,
-          (decodedText) => {
+      const onScan = (decodedText) => {
             const now = Date.now();
 
             const isDuplicate = decodedText === this.lastScannedCode;
@@ -76,11 +74,28 @@ export default {
               // Emit scanned result to parent component
               this.$emit("qr-scanned", decodedText);
             }
-          },
-          (error) => {
+      };
 
-          }
-      );
+      const cameraConfigs = [
+        { facingMode: "environment" },
+        { facingMode: "user" },
+        true,
+      ];
+
+      const tryStart = (index) => {
+        if (index >= cameraConfigs.length) {
+          console.error("Could not start QR scanner: no suitable camera found.");
+          return;
+        }
+        this.qrCodeScanner.start(
+          cameraConfigs[index],
+          config,
+          onScan,
+          () => {},
+        ).catch(() => tryStart(index + 1));
+      };
+
+      tryStart(0);
     },
     onConfirm(confirmed) {
       if (confirmed && this.pendingDecodedText) {
