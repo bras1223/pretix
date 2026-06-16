@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -79,7 +79,7 @@ def scheduled_mail_create(sender, **kwargs):
 @receiver(nav_event, dispatch_uid="sendmail_nav")
 def control_nav_import(sender, request=None, **kwargs):
     url = resolve(request.path_info)
-    if not request.user.has_event_permission(request.organizer, request.event, 'can_change_orders', request=request):
+    if not request.user.has_event_permission(request.organizer, request.event, 'event.orders:write', request=request):
         return []
     return [
         {
@@ -232,7 +232,7 @@ def sendmail_copy_data_receiver(sender, other, item_map, **kwargs):
     if sender.sendmail_rules.exists():  # idempotency
         return
 
-    for r in other.sendmail_rules.prefetch_related('limit_products'):
+    for r in other.sendmail_rules.filter(subevent__isnull=True).prefetch_related('limit_products'):
         limit_products = list(r.limit_products.all())
         r = copy.copy(r)
         r.pk = None
@@ -247,7 +247,7 @@ sendmail_view_classes = EventPluginSignal()
 This signal allows you to register subclasses of ``pretix.plugins.sendmail.views.BaseSenderView`` that should be
 discovered by this plugin.
 
-As with all plugin signals, the ``sender`` keyword will contain the event.
+As with all event plugin signals, the ``sender`` keyword will contain the event.
 """
 
 

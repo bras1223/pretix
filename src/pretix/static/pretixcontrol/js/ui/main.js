@@ -60,7 +60,7 @@ var i18nToString = function (i18nstring) {
 $(document).ajaxError(function (event, jqXHR, settings, thrownError) {
     waitingDialog.hide();
     var c = $(jqXHR.responseText).filter('.container');
-    if (jqXHR.responseText.indexOf("<!-- pretix-login-marker -->") !== -1) {
+    if (jqXHR.responseText && jqXHR.responseText.indexOf("<!-- pretix-login-marker -->") !== -1) {
         location.href = '/control/login?next=' + encodeURIComponent(location.pathname + location.search + location.hash)
     } else if (c.length > 0) {
         ajaxErrDialog.show(c.first().html());
@@ -71,6 +71,7 @@ $(document).ajaxError(function (event, jqXHR, settings, thrownError) {
 });
 
 var form_handlers = function (el) {
+    el.trigger("rescan.areYouSure");
     el.find("[data-formset]").formset(
         {
             animateForms: true,
@@ -79,6 +80,23 @@ var form_handlers = function (el) {
     );
     el.find("[data-formset]").on("formAdded", "div", function (event) {
         form_handlers($(event.target));
+    });
+    el.find("[data-formset] [data-formset-sort]").on("click", function (event) {
+        // Sort forms alphabetically by their first field
+        var $formset = $(this).closest("[data-formset]");
+        var $forms = $formset.find("[data-formset-form]").not("[data-formset-form-deleted]")
+        var compareForms = function(form_a, form_b) {
+            var a = $(form_a).find('input:not([name*=-ORDER]):not([name*=-DELETE]):not([name*=-id])').val();
+            var b = $(form_b).find('input:not([name*=-ORDER]):not([name*=-DELETE]):not([name*=-id])').val();
+            return a.localeCompare(b);
+        }
+        $forms = $forms.sort(compareForms);
+        $forms.each(function(i, form) {
+            var $order = $(form).find('[name*=-ORDER]');
+            $order.val(i + 1);
+        });
+        // Trigger visual reorder
+        $formset.find("[name*=-ORDER]").first().trigger("change");
     });
 
     // Vouchers
@@ -323,13 +341,15 @@ var form_handlers = function (el) {
     }
 
     el.find("input[data-checkbox-dependency]").each(function () {
+        var initially_disabled = $(this).prop("disabled");
         var dependent = $(this),
             dependency = findDependency($(this).attr("data-checkbox-dependency"), this),
             update = function () {
                 var enabled = dependency.prop('checked');
-                dependent.prop('disabled', !enabled).closest('.form-group, .form-field-boundary').toggleClass('disabled', !enabled);
+                dependent.prop('disabled', !enabled || initially_disabled).closest('.form-group, .form-field-boundary').toggleClass('disabled', !enabled);
                 if (!enabled && !dependent.is('[data-checkbox-dependency-visual]')) {
                     dependent.prop('checked', false);
+                    dependent.trigger('change')
                 }
             };
         update();
@@ -347,12 +367,13 @@ var form_handlers = function (el) {
         dependency.on("change", update);
     });
 
-    el.find("div[data-display-dependency], textarea[data-display-dependency], input[data-display-dependency], select[data-display-dependency]").each(function () {
+    el.find("div[data-display-dependency], textarea[data-display-dependency], input[data-display-dependency], select[data-display-dependency], button[data-display-dependency]").each(function () {
+        var initially_disabled = $(this).prop("disabled");
         var dependent = $(this),
             dependency = findDependency($(this).attr("data-display-dependency"), this),
             update = function (ev) {
                 var enabled = dependency.toArray().some(function(d) {
-                    if (d.disabled) return false;
+                    if (d.disabled && !initially_disabled) return false;
                     if (d.type === 'checkbox' || d.type === 'radio') {
                         return d.checked;
                     } else if (d.type === 'select-one') {
@@ -372,10 +393,11 @@ var form_handlers = function (el) {
                     enabled = !enabled;
                 }
                 var $toggling = dependent;
-                if (dependent.attr("data-disable-dependent")) {
-                    $toggling.attr('disabled', !enabled).trigger("change");
+                if (dependent.is("[data-disable-dependent]")) {
+                    $toggling.attr('disabled', !enabled || initially_disabled).trigger("change");
                 }
-                if (dependent.get(0).tagName.toLowerCase() !== "div") {
+                const tagName = dependent.get(0).tagName.toLowerCase()
+                if (tagName !== "div" && tagName !== "button") {
                     $toggling = dependent.closest('.form-group');
                 }
                 if (ev) {
@@ -396,16 +418,24 @@ var form_handlers = function (el) {
 
     el.find("input[data-required-if], select[data-required-if], textarea[data-required-if]").each(function () {
         var dependent = $(this),
-            dependency = $($(this).attr("data-required-if")),
+            dependencies = $($(this).attr("data-required-if")),
             update = function (ev) {
-                var enabled = (dependency.attr("type") === 'checkbox' || dependency.attr("type") === 'radio') ? dependency.prop('checked') : !!dependency.val();
+                var enabled = true;
+                dependencies.each(function () {
+                    var dependency = $(this);
+                    var e = (dependency.attr("type") === 'checkbox' || dependency.attr("type") === 'radio') ? dependency.prop('checked') : !!dependency.val();
+                    enabled = enabled && e;
+                });
                 dependent.prop('required', enabled).closest('.form-group').toggleClass('required', enabled).find('.optional').stop().animate({
                     'opacity': enabled ? 0 : 1
                 }, ev ? 500 : 1);
             };
         update();
-        dependency.closest('.form-group').find('input[name=' + dependency.attr("name") + ']').on("change", update);
-        dependency.closest('.form-group').find('input[name=' + dependency.attr("name") + ']').on("dp.change", update);
+        dependencies.each(function () {
+            var dependency = $(this);
+            dependency.closest('.form-group').find('input[name=' + dependency.attr("name") + ']').on("change", update);
+            dependency.closest('.form-group').find('input[name=' + dependency.attr("name") + ']').on("dp.change", update);
+        });
     });
 
     el.find("div.scrolling-choice:not(.no-search)").each(function () {
@@ -484,6 +514,7 @@ var form_handlers = function (el) {
             theme: "bootstrap",
             language: $("body").attr("data-select2-locale"),
             data: JSON.parse($(this.getAttribute('data-select2-src')).text()),
+            width: '100%',
         }).val(selectedValue).trigger('change');
     });
 
@@ -532,7 +563,7 @@ var form_handlers = function (el) {
             allowClear: !$s.prop("required"),
             width: '100%',
             language: $("body").attr("data-select2-locale"),
-            placeholder: $(this).attr("data-placeholder"),
+            placeholder: $(this).attr("data-placeholder") || "",
             ajax: {
                 url: $(this).attr('data-select2-url'),
                 data: function (params) {
@@ -593,7 +624,7 @@ var form_handlers = function (el) {
                     }
                 }
             },
-            placeholder: $(this).attr("data-placeholder"),
+            placeholder: $(this).attr("data-placeholder") || "",
             templateResult: function (res) {
                 if (!res.id) {
                     return res.text;

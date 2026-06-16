@@ -2,6 +2,7 @@
 {% load static %}
 {% load i18n %}
 {% load statici18n %}
+{% load vite %}
 {% load eventsignal %}
 {% load eventurl %}
 {% load dialog %}
@@ -84,6 +85,7 @@
         <meta name="theme-color" content="#3b1c4a">
         <meta name="referrer" content="origin">
 
+        {% vite_importmap %}
         {% block custom_header %}{% endblock %}
 	</head>
 	<body data-datetimeformat="{{ js_datetime_format }}" data-timeformat="{{ js_time_format }}"
@@ -126,7 +128,9 @@
                     {% endif %}
                     <a class="navbar-brand" href="{% url "control:index" %}">
                         <img src="{% static "pretixbase/img/caught-icon-white-mini.svg" %}" />
-                        {{ settings.PRETIX_INSTANCE_NAME }}
+                        <span>
+                            {{ settings.PRETIX_INSTANCE_NAME }}
+                        </span>
                     </a>
                 </div>
                 <ul class="nav navbar-nav navbar-top-links navbar-left flip hidden-xs">
@@ -198,7 +202,7 @@
                         </li>
                     {% elif request.user.is_staff and staff_session %}
                         <li>
-                            <a href="{% url 'control:user.sudo.stop' %}" class="danger">
+                            <a href="{% url 'control:user.sudo.stop' %}" class="danger admin-only">
                                 <i class="fa fa-id-card"></i> {% trans "End admin session" %}
                             </a>
                         </li>

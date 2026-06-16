@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -47,13 +47,14 @@ from collections import OrderedDict, defaultdict
 from functools import partial
 from io import BytesIO
 
-import jsonschema
+import pypdf
+import pypdf.generic
 import reportlab.rl_config
 from bidi import get_display
 from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.core.exceptions import ValidationError
-from django.db.models import Max, Min
+from django.db.models import Exists, Max, Min, OuterRef
 from django.db.models.fields.files import FieldFile
 from django.dispatch import receiver
 from django.utils.deconstruct import deconstructible
@@ -70,19 +71,20 @@ from reportlab.lib.colors import Color
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import getAscentDescent
-from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Paragraph
 
 from pretix.base.i18n import language
-from pretix.base.models import Event, Order, OrderPosition, Question
+from pretix.base.models import Checkin, Event, Order, OrderPosition, Question
 from pretix.base.settings import PERSON_NAME_SCHEMES
 from pretix.base.signals import layout_image_variables, layout_text_variables
 from pretix.base.templatetags.money import money_filter
 from pretix.base.templatetags.phone_format import phone_format
-from pretix.helpers.reportlab import ThumbnailingImageReader, reshaper
+from pretix.helpers.daterange import datetimerange
+from pretix.helpers.reportlab import (
+    ThumbnailingImageReader, register_ttf_font_if_new, reshaper,
+)
 from pretix.presale.style import get_fonts
 
 logger = logging.getLogger(__name__)
@@ -159,8 +161,17 @@ DEFAULT_VARIABLES = OrderedDict((
         "editor_sample": _("123.45 EUR"),
         "evaluate": lambda op, order, event: money_filter(op.price, event.currency)
     }),
+    ("price_with_bundled", {
+        "label": _("Price including bundled products"),
+        "editor_sample": _("123.45 EUR"),
+        "evaluate": lambda op, order, event: money_filter(op.price + sum(
+            p.price
+            for p in op.addons.all()
+            if not p.canceled and p.is_bundled
+        ), event.currency)
+    }),
     ("price_with_addons", {
-        "label": _("Price including add-ons"),
+        "label": _("Price including add-ons and bundled products"),
         "editor_sample": _("123.45 EUR"),
         "evaluate": lambda op, order, event: money_filter(op.price + sum(
             p.price
@@ -368,6 +379,13 @@ DEFAULT_VARIABLES = OrderedDict((
             str(p) for p in generate_compressed_addon_list(op, order, ev)
         ])
     }),
+    ("checked_in_addons", {
+        "label": _("List of Checked-In Add-Ons"),
+        "editor_sample": _("Add-on 1\n2x Add-on 2"),
+        "evaluate": lambda op, order, ev: "\n".join([
+            str(p) for p in generate_compressed_addon_list(op, order, ev, only_checked_in=True)
+        ])
+    }),
     ("organizer", {
         "label": _("Organizer name"),
         "editor_sample": _("Event organizer company"),
@@ -478,6 +496,12 @@ DEFAULT_VARIABLES = OrderedDict((
             op.valid_until.astimezone(ev.timezone),
             "TIME_FORMAT"
         ) if op.valid_until else ""
+    }),
+    ("program_times", {
+        "label": _("Program times"),
+        "editor_sample": _(
+            "2017-05-31 10:00 – 12:00, Room 1\n2017-05-31 14:00 – 16:00, Room 2\n2017-05-31 14:00 – 2017-06-01 14:00, Building A"),
+        "evaluate": lambda op, order, ev: get_program_times(op, ev)
     }),
     ("medium_identifier", {
         "label": _("Reusable Medium ID"),
@@ -723,12 +747,32 @@ def get_seat(op: OrderPosition):
     return None
 
 
-def generate_compressed_addon_list(op, order, event):
+def get_program_times(op: OrderPosition, ev: Event):
+    ptstr = []
+    for pt in op.item.program_times.all():
+        ptstr.append([
+            datetimerange(
+                pt.start.astimezone(ev.timezone),
+                pt.end.astimezone(ev.timezone),
+                as_html=False
+            ),
+            (', ' + ', '.join(
+                l.strip() for l in str(pt.location).splitlines() if l.strip())
+             ) if str(pt.location).strip() else ''
+        ])
+    return '\n'.join(''.join(l) for l in ptstr)
+
+
+def generate_compressed_addon_list(op, order, event, only_checked_in=False):
     itemcount = defaultdict(int)
-    addons = [p for p in (
+    addon_qs = (
         op.addons.all() if 'addons' in getattr(op, '_prefetched_objects_cache', {})
         else op.addons.select_related('item', 'variation')
-    ) if not p.canceled]
+    )
+    if only_checked_in:
+        addon_qs = addon_qs.filter(Exists(Checkin.objects.filter(position=OuterRef('pk'))), canceled=False)
+    addons = [p for p in addon_qs if not p.canceled]
+
     for pos in addons:
         itemcount[pos.item, pos.variation] += 1
 
@@ -767,19 +811,19 @@ class Renderer:
     def _register_fonts(cls, event: Event = None):
         if hasattr(cls, '_fonts_registered'):
             return
-        pdfmetrics.registerFont(TTFont('Open Sans', finders.find('fonts/OpenSans-Regular.ttf')))
-        pdfmetrics.registerFont(TTFont('Open Sans I', finders.find('fonts/OpenSans-Italic.ttf')))
-        pdfmetrics.registerFont(TTFont('Open Sans B', finders.find('fonts/OpenSans-Bold.ttf')))
-        pdfmetrics.registerFont(TTFont('Open Sans B I', finders.find('fonts/OpenSans-BoldItalic.ttf')))
+        register_ttf_font_if_new('Open Sans', finders.find('fonts/OpenSans-Regular.ttf'))
+        register_ttf_font_if_new('Open Sans I', finders.find('fonts/OpenSans-Italic.ttf'))
+        register_ttf_font_if_new('Open Sans B', finders.find('fonts/OpenSans-Bold.ttf'))
+        register_ttf_font_if_new('Open Sans B I', finders.find('fonts/OpenSans-BoldItalic.ttf'))
 
         for family, styles in get_fonts(event, pdf_support_required=True).items():
-            pdfmetrics.registerFont(TTFont(family, finders.find(styles['regular']['truetype'])))
+            register_ttf_font_if_new(family, finders.find(styles['regular']['truetype']))
             if 'italic' in styles:
-                pdfmetrics.registerFont(TTFont(family + ' I', finders.find(styles['italic']['truetype'])))
+                register_ttf_font_if_new(family + ' I', finders.find(styles['italic']['truetype']))
             if 'bold' in styles:
-                pdfmetrics.registerFont(TTFont(family + ' B', finders.find(styles['bold']['truetype'])))
+                register_ttf_font_if_new(family + ' B', finders.find(styles['bold']['truetype']))
             if 'bolditalic' in styles:
-                pdfmetrics.registerFont(TTFont(family + ' B I', finders.find(styles['bolditalic']['truetype'])))
+                register_ttf_font_if_new(family + ' B I', finders.find(styles['bolditalic']['truetype']))
 
         cls._fonts_registered = True
 
@@ -808,7 +852,7 @@ class Renderer:
             # and does not deal with our default value here properly
             content = op.secret
         else:
-            content = self._get_text_content(op, order, o)
+            content = self._get_text_content(op, order, o).strip()
 
         if len(content) == 0:
             return
@@ -885,7 +929,7 @@ class Renderer:
 
             # We do not use str.format like in emails so we (a) can evaluate lazily and (b) can re-implement this
             # 1:1 on other platforms that render PDFs through our API (libpretixprint)
-            return re.sub(r'\{([a-zA-Z0-9:_]+)\}', replace, text)
+            return re.sub(r'\{([-a-zA-Z0-9:_]+)\}', replace, text)
 
         elif o['content'].startswith('itemmeta:'):
             if op.variation_id:
@@ -1178,8 +1222,7 @@ class Renderer:
 
             for i, page in enumerate(fg_pdf.pages):
                 bg_page = self.bg_pdf.pages[i]
-                if bg_page.rotation != 0:
-                    bg_page.transfer_rotation_to_content()
+                _correct_page_media_box(bg_page)
                 page.merge_page(bg_page, over=False)
                 output.add_page(page)
 
@@ -1248,8 +1291,7 @@ def merge_background(fg_pdf: PdfWriter, bg_pdf: PdfWriter, out_file, compress):
     else:
         for i, page in enumerate(fg_pdf.pages):
             bg_page = bg_pdf.pages[i]
-            if bg_page.rotation != 0:
-                bg_page.transfer_rotation_to_content()
+            _correct_page_media_box(bg_page)
             page.merge_page(bg_page, over=False)
 
         # pdf_header is a string like "%pdf-X.X"
@@ -1259,9 +1301,34 @@ def merge_background(fg_pdf: PdfWriter, bg_pdf: PdfWriter, out_file, compress):
         fg_pdf.write(out_file)
 
 
+def _correct_page_media_box(page: pypdf.PageObject):
+    if page.rotation != 0:
+        page.transfer_rotation_to_content()
+    media_box = page.mediabox
+    trsf = pypdf.Transformation()
+    if media_box.bottom != 0:
+        trsf = trsf.translate(0, -media_box.bottom)
+    if media_box.left != 0:
+        trsf = trsf.translate(-media_box.left, 0)
+    page.add_transformation(trsf, False)
+    for b in ["/MediaBox", "/CropBox", "/BleedBox", "/TrimBox", "/ArtBox"]:
+        if b in page:
+            rr = pypdf.generic.RectangleObject(page[b])
+            pt1 = trsf.apply_on(rr.lower_left)
+            pt2 = trsf.apply_on(rr.upper_right)
+            page[pypdf.generic.NameObject(b)] = pypdf.generic.RectangleObject((
+                min(pt1[0], pt2[0]),
+                min(pt1[1], pt2[1]),
+                max(pt1[0], pt2[0]),
+                max(pt1[1], pt2[1]),
+            ))
+
+
 @deconstructible
 class PdfLayoutValidator:
     def __call__(self, value):
+        import jsonschema
+
         if not isinstance(value, dict):
             try:
                 val = json.loads(value)

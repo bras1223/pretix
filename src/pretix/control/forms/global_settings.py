@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -104,6 +104,13 @@ class GlobalSettingsForm(SettingsForm):
                 help_text=_("Will be served at {domain}/.well-known/apple-developer-merchantid-domain-association").format(
                     domain=settings.SITE_URL
                 )
+            )),
+            ('widget_vite_origins', forms.CharField(
+                widget=forms.Textarea(attrs={'rows': '3'}),
+                required=False,
+                # Not translated on purpose, this is a temporary feature and contains too many special case words
+                label="Vite widget origins",
+                help_text="One origin per line (e.g. https://example.com). Requests from these origins will be served the new vite-based widget.",
             ))
         ])
         responses = register_global_settings.send(self)

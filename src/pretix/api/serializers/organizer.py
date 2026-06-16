@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -24,6 +24,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models import Q
 from django.utils.crypto import get_random_string
 from django.utils.translation import gettext_lazy as _
@@ -32,6 +33,7 @@ from rest_framework.exceptions import ValidationError
 
 from pretix.api.auth.devicesecurity import get_all_security_profiles
 from pretix.api.serializers import AsymmetricField
+from pretix.api.serializers.fields import PluginsField
 from pretix.api.serializers.i18n import I18nAwareModelSerializer
 from pretix.api.serializers.order import CompatibleJSONField
 from pretix.api.serializers.settings import SettingsSerializer
@@ -43,8 +45,19 @@ from pretix.base.models import (
     SalesChannel, SeatingPlan, Team, TeamAPIToken, TeamInvite, User,
 )
 from pretix.base.models.seating import SeatingPlanLayoutValidator
-from pretix.base.services.mail import SendMailException, mail
+from pretix.base.permissions import (
+    get_all_event_permission_groups, get_all_organizer_permission_groups,
+)
+from pretix.base.plugins import (
+    PLUGIN_LEVEL_EVENT, PLUGIN_LEVEL_EVENT_ORGANIZER_HYBRID,
+    PLUGIN_LEVEL_ORGANIZER,
+)
+from pretix.base.services.mail import mail
 from pretix.base.settings import validate_organizer_settings
+from pretix.helpers.permission_migration import (
+    OLD_TO_NEW_EVENT_COMPAT, OLD_TO_NEW_EVENT_MIGRATION,
+    OLD_TO_NEW_ORGANIZER_COMPAT, OLD_TO_NEW_ORGANIZER_MIGRATION,
+)
 from pretix.helpers.urls import build_absolute_uri as build_global_uri
 from pretix.multidomain.urlreverse import build_absolute_uri
 
@@ -53,13 +66,47 @@ logger = logging.getLogger(__name__)
 
 class OrganizerSerializer(I18nAwareModelSerializer):
     public_url = serializers.SerializerMethodField('get_organizer_url', read_only=True)
+    plugins = PluginsField(required=False, source='*')
+    name = serializers.CharField(read_only=True)
+    slug = serializers.CharField(read_only=True)
 
     def get_organizer_url(self, organizer):
         return build_absolute_uri(organizer, 'presale:organizer.index')
 
     class Meta:
         model = Organizer
-        fields = ('name', 'slug', 'public_url')
+        fields = ('name', 'slug', 'public_url', 'plugins')
+
+    def validate_plugins(self, value):
+        from pretix.base.plugins import get_all_plugins
+
+        plugins_available = {
+            p.module: p for p in get_all_plugins(organizer=self.instance)
+            if not p.name.startswith('.') and getattr(p, 'visible', True)
+        }
+        settings_holder = self.instance
+
+        allowed_levels = (PLUGIN_LEVEL_ORGANIZER, PLUGIN_LEVEL_EVENT_ORGANIZER_HYBRID)
+        for plugin in value.get('plugins'):
+            if plugin not in plugins_available:
+                raise ValidationError(_('Unknown plugin: \'{name}\'.').format(name=plugin))
+            if getattr(plugins_available[plugin], 'restricted', False):
+                if plugin not in settings_holder.settings.allowed_restricted_plugins:
+                    raise ValidationError(_('Restricted plugin: \'{name}\'.').format(name=plugin))
+            if getattr(plugins_available[plugin], 'level', PLUGIN_LEVEL_EVENT) not in allowed_levels:
+                raise ValidationError('Plugin cannot be enabled on this level: \'{name}\'.'.format(name=plugin))
+
+        return value
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        plugins = validated_data.pop('plugins', None)
+        organizer = super().update(instance, validated_data)
+        # Plugins
+        if plugins is not None:
+            organizer.set_active_plugins(plugins)
+            organizer.save()
+        return organizer
 
 
 class SeatingPlanSerializer(I18nAwareModelSerializer):
@@ -239,6 +286,19 @@ class GiftCardSerializer(I18nAwareModelSerializer):
                 )
         return data
 
+    def to_representation(self, instance):
+        r = super().to_representation(instance)
+        request = self.context.get('request')
+        # late permission evaluations for checks that depend on the actual linked events
+        if 'owner_ticket' in self.context['request'].query_params.getlist('expand'):
+            owner_ticket = instance.owner_ticket
+            if owner_ticket:
+                event = owner_ticket.order.event
+                perm_holder = request.auth if isinstance(request.auth, (Device, TeamAPIToken)) else request.user
+                if not perm_holder.has_event_permission(event.organizer, event, 'event.orders:read', request):
+                    r['owner_ticket'] = {'id': instance.owner_ticket.id}
+        return r
+
     class Meta:
         model = GiftCard
         fields = ('id', 'secret', 'issuance', 'value', 'currency', 'testmode', 'expires', 'conditions', 'owner_ticket',
@@ -266,23 +326,128 @@ class EventSlugField(serializers.SlugRelatedField):
         return self.context['organizer'].events.all()
 
 
+class PermissionMultipleChoiceField(serializers.MultipleChoiceField):
+    def to_internal_value(self, data):
+        return {
+            p: True for p in super().to_internal_value(data)
+        }
+
+    def to_representation(self, value):
+        return [p for p, v in value.items() if v]
+
+
 class TeamSerializer(serializers.ModelSerializer):
     limit_events = EventSlugField(slug_field='slug', many=True)
+    limit_event_permissions = PermissionMultipleChoiceField(choices=[], required=False, allow_null=False, allow_empty=True)
+    limit_organizer_permissions = PermissionMultipleChoiceField(choices=[], required=False, allow_null=False, allow_empty=True)
+
+    # Legacy fields, handled in to_representation and validate
+    can_change_event_settings = serializers.BooleanField(required=False, write_only=True)
+    can_change_items = serializers.BooleanField(required=False, write_only=True)
+    can_view_orders = serializers.BooleanField(required=False, write_only=True)
+    can_change_orders = serializers.BooleanField(required=False, write_only=True)
+    can_checkin_orders = serializers.BooleanField(required=False, write_only=True)
+    can_view_vouchers = serializers.BooleanField(required=False, write_only=True)
+    can_change_vouchers = serializers.BooleanField(required=False, write_only=True)
+    can_create_events = serializers.BooleanField(required=False, write_only=True)
+    can_change_organizer_settings = serializers.BooleanField(required=False, write_only=True)
+    can_change_teams = serializers.BooleanField(required=False, write_only=True)
+    can_manage_gift_cards = serializers.BooleanField(required=False, write_only=True)
+    can_manage_customers = serializers.BooleanField(required=False, write_only=True)
+    can_manage_reusable_media = serializers.BooleanField(required=False, write_only=True)
 
     class Meta:
         model = Team
         fields = (
-            'id', 'name', 'require_2fa', 'all_events', 'limit_events', 'can_create_events', 'can_change_teams',
-            'can_change_organizer_settings', 'can_manage_gift_cards', 'can_change_event_settings',
-            'can_change_items', 'can_view_orders', 'can_change_orders', 'can_view_vouchers',
-            'can_change_vouchers', 'can_checkin_orders', 'can_manage_customers', 'can_manage_reusable_media'
+            'id', 'name', 'require_2fa', 'all_events', 'limit_events', 'all_event_permissions', 'limit_event_permissions',
+            'all_organizer_permissions', 'limit_organizer_permissions', 'can_change_event_settings',
+            'can_change_items', 'can_view_orders', 'can_change_orders', 'can_checkin_orders', 'can_view_vouchers',
+            'can_change_vouchers', 'can_create_events', 'can_change_organizer_settings', 'can_change_teams',
+            'can_manage_gift_cards', 'can_manage_customers', 'can_manage_reusable_media'
         )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        event_perms_flattened = []
+        organizer_perms_flattened = []
+        for pg in get_all_event_permission_groups().values():
+            for action in pg.actions:
+                event_perms_flattened.append(f"{pg.name}:{action}")
+        for pg in get_all_organizer_permission_groups().values():
+            for action in pg.actions:
+                organizer_perms_flattened.append(f"{pg.name}:{action}")
+
+        self.fields['limit_event_permissions'].choices = [(p, p) for p in event_perms_flattened]
+        self.fields['limit_organizer_permissions'].choices = [(p, p) for p in organizer_perms_flattened]
+
+    def to_representation(self, instance):
+        r = super().to_representation(instance)
+        for old, new in OLD_TO_NEW_EVENT_COMPAT.items():
+            r[old] = instance.all_event_permissions or all(instance.limit_event_permissions.get(n) for n in new)
+        for old, new in OLD_TO_NEW_ORGANIZER_COMPAT.items():
+            r[old] = instance.all_organizer_permissions or all(instance.limit_organizer_permissions.get(n) for n in new)
+        return r
+
     def validate(self, data):
+        old_data_set = any(k.startswith("can_") for k in data)
+        new_data_set = any(k in data for k in [
+            "all_event_permissions", "limit_event_permissions", "all_organizer_permissions", "limit_organizer_permissions"
+        ])
+        if old_data_set and new_data_set:
+            raise ValidationError("You cannot set deprecated and current permission attributes at the same time.")
+
         full_data = self.to_internal_value(self.to_representation(self.instance)) if self.instance else {}
         full_data.update(data)
+
+        if new_data_set:
+            if full_data.get('limit_event_permissions') and full_data.get('all_event_permissions'):
+                raise ValidationError('Do not set both limit_event_permissions and all_event_permissions.')
+            if full_data.get('limit_organizer_permissions') and full_data.get('all_organizer_permissions'):
+                raise ValidationError('Do not set both limit_organizer_permissions and all_organizer_permissions.')
+
+        if old_data_set:
+            # Migrate with same logic as in migration 0297_pluggable_permissions
+            if all(full_data.get(k) is True for k in OLD_TO_NEW_EVENT_MIGRATION.keys() if k != "can_checkin_orders"):
+                data["all_event_permissions"] = True
+                data["limit_event_permissions"] = {}
+            else:
+                data["all_event_permissions"] = False
+                data["limit_event_permissions"] = {}
+                for k, v in OLD_TO_NEW_EVENT_MIGRATION.items():
+                    if full_data.get(k) is True:
+                        data["limit_event_permissions"].update({kk: True for kk in v})
+            if all(full_data.get(k) is True for k in OLD_TO_NEW_ORGANIZER_MIGRATION.keys() if k != "can_checkin_orders"):
+                data["all_organizer_permissions"] = True
+                data["limit_organizer_permissions"] = {}
+            else:
+                data["all_organizer_permissions"] = False
+                data["limit_organizer_permissions"] = {}
+                for k, v in OLD_TO_NEW_ORGANIZER_MIGRATION.items():
+                    if full_data.get(k) is True:
+                        data["limit_organizer_permissions"].update({kk: True for kk in v})
+
         if full_data.get('limit_events') and full_data.get('all_events'):
             raise ValidationError('Do not set both limit_events and all_events.')
+
+        full_data.update(data)
+        for pg in get_all_event_permission_groups().values():
+            requested = ",".join(sorted(
+                a for a in pg.actions if self.instance and full_data["limit_event_permissions"].get(f"{pg.name}:{a}")
+            ))
+            if requested not in (",".join(sorted(opt.actions)) for opt in pg.options):
+                possible = '\' or \''.join(','.join(opt.actions) for opt in pg.options)
+                raise ValidationError(f"For permission group {pg.name}, the valid combinations of actions are "
+                                      f"'{possible}' but you tried to set '{requested}'.")
+        for pg in get_all_organizer_permission_groups().values():
+            requested = ",".join(sorted(
+                a for a in pg.actions if self.instance and full_data["limit_organizer_permissions"].get(f"{pg.name}:{a}")
+            ))
+            if requested not in (",".join(sorted(opt.actions)) for opt in pg.options):
+                possible = '\' or \''.join(','.join(opt.actions) for opt in pg.options)
+                raise ValidationError(f"For permission group {pg.name}, the valid combinations of actions are "
+                                      f"'{possible}' but you tried to set '{requested}'.")
+
         return data
 
 
@@ -299,7 +464,7 @@ class DeviceSerializer(serializers.ModelSerializer):
     created = serializers.DateTimeField(read_only=True)
     revoked = serializers.BooleanField(read_only=True)
     initialized = serializers.DateTimeField(read_only=True)
-    initialization_token = serializers.DateTimeField(read_only=True)
+    initialization_token = serializers.CharField(read_only=True)
     security_profile = serializers.ChoiceField(choices=[], required=False, default="full")
 
     class Meta:
@@ -313,6 +478,8 @@ class DeviceSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['security_profile'].choices = [(k, v.verbose_name) for k, v in get_all_security_profiles().items()]
+        if not self.context['can_see_tokens']:
+            del self.fields['initialization_token']
 
 
 class TeamInviteSerializer(serializers.ModelSerializer):
@@ -323,24 +490,22 @@ class TeamInviteSerializer(serializers.ModelSerializer):
         )
 
     def _send_invite(self, instance):
-        try:
-            mail(
-                instance.email,
-                _('pretix account invitation'),
-                'pretixcontrol/email/invitation.txt',
-                {
-                    'user': self,
-                    'organizer': self.context['organizer'].name,
-                    'team': instance.team.name,
-                    'url': build_global_uri('control:auth.invite', kwargs={
-                        'token': instance.token
-                    })
-                },
-                event=None,
-                locale=get_language_without_region()  # TODO: expose?
-            )
-        except SendMailException:
-            pass  # Already logged
+        mail(
+            instance.email,
+            _('Account invitation'),
+            'pretixcontrol/email/invitation.txt',
+            {
+                'instance': settings.PRETIX_INSTANCE_NAME,
+                'user': self,
+                'organizer': self.context['organizer'].name,
+                'team': instance.team.name,
+                'url': build_global_uri('control:auth.invite', kwargs={
+                    'token': instance.token
+                })
+            },
+            event=None,
+            locale=get_language_without_region()  # TODO: expose?
+        )
 
     def create(self, validated_data):
         if 'email' in validated_data:
@@ -399,10 +564,14 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 
 
 class OrganizerSettingsSerializer(SettingsSerializer):
+    default_write_permission = 'organizer.settings.general:write'
     default_fields = [
+        # These are readable for all users with access to the events, therefore secrets stored in the settings store
+        # should not be included!
         'customer_accounts',
         'customer_accounts_native',
         'customer_accounts_link_by_email',
+        'customer_accounts_require_login_for_order_access',
         'invoice_regenerate_allowed',
         'contact_mail',
         'imprint_url',
@@ -444,6 +613,7 @@ class OrganizerSettingsSerializer(SettingsSerializer):
         'reusable_media_type_nfc_mf0aes',
         'reusable_media_type_nfc_mf0aes_autocreate_giftcard',
         'reusable_media_type_nfc_mf0aes_autocreate_giftcard_currency',
+        'reusable_media_type_nfc_mf0aes_random_uid',
     ]
 
     def __init__(self, *args, **kwargs):

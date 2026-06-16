@@ -222,9 +222,25 @@ var form_handlers = function (el) {
             }
         });
     }
+
+    el.find('.use_giftcard').on("click", function () {
+        var value = $(this).data('value');
+        $('#id_payment_giftcard-code').val(value)
+    })
+
 };
 
 function setup_basics(el) {
+    el.find("form").attr("novalidate", true).on("submit", function (e) {
+        if (!this.checkValidity()) {
+            var input = this.querySelector(":invalid:not(fieldset)");
+            (input.labels[0] || input).scrollIntoView();
+            // only use reportValidity, which usually sets focus on element
+            // input.focus() opens dropdowns, which is not what we want
+            input.reportValidity();
+            e.preventDefault();
+        }
+    });
     el.find("input[data-toggle=radiocollapse]").change(function () {
         $($(this).attr("data-parent")).find(".collapse.in").collapse('hide');
         $($(this).attr("data-target")).collapse('show');
@@ -241,10 +257,6 @@ function setup_basics(el) {
 
     el.find(".js-only").removeClass("js-only");
     el.find(".js-hidden").hide();
-    // make sure to always have a #content for skip-link to work
-    if (!document.querySelector("#content")) {
-        (document.querySelector('main') || document.querySelector('.page-header + *')).id = "content"
-    }
 
     el.find("div.collapsed").removeClass("collapsed").addClass("collapse");
     el.find(".has-error, .alert-danger").each(function () {
@@ -502,13 +514,17 @@ $(function () {
     $("input[data-required-if], select[data-required-if], textarea[data-required-if]").each(function () {
         var dependent = $(this),
             dependentLabel = $("label[for="+this.id+"]"),
-            dependency = $($(this).attr("data-required-if")),
+            dependencies = $($(this).attr("data-required-if")),
             update = function (ev) {
-                var enabled = (dependency.attr("type") === 'checkbox' || dependency.attr("type") === 'radio') ? dependency.prop('checked') : !!dependency.val();
+                var enabled = true;
+                dependencies.each(function () {
+                    var dependency = $(this);
+                    var e = (dependency.attr("type") === 'checkbox' || dependency.attr("type") === 'radio') ? dependency.prop('checked') : !!dependency.val();
+                    enabled = enabled && e;
+                });
                 if (!dependent.is("[data-no-required-attr]")) {
                     dependent.prop('required', enabled);
                 }
-                dependent.closest('.form-group').toggleClass('required', enabled);
                 if (enabled) {
                     dependentLabel.append('<i class="label-required">' + gettext('required') + '</i>');
                 }
@@ -517,8 +533,11 @@ $(function () {
                 }
             };
         update();
-        dependency.closest('.form-group').find('input[name=' + dependency.attr("name") + ']').on("change", update);
-        dependency.closest('.form-group').find('input[name=' + dependency.attr("name") + ']').on("dp.change", update);
+        dependencies.each(function () {
+            var dependency = $(this);
+            dependency.closest('.form-group').find('input[name=' + dependency.attr("name") + ']').on("change", update);
+            dependency.closest('.form-group').find('input[name=' + dependency.attr("name") + ']').on("dp.change", update);
+        });
     });
 
     $("input[data-display-dependency], div[data-display-dependency], select[data-display-dependency], textarea[data-display-dependency]").each(function () {
@@ -706,7 +725,7 @@ $(function () {
     // free-range price input auto-check checkbox/set count-input to 1 if 0
     $("[data-checked-onchange]").each(function() {
         var countInput = this;
-        $("#" + this.getAttribute("data-checked-onchange")).on("change", function() {
+        $("#" + this.getAttribute("data-checked-onchange")).on("input", function() {
             if (countInput.type === "checkbox") {
                 if (countInput.checked) return;
                 countInput.checked = true;
@@ -720,6 +739,11 @@ $(function () {
             // in case of a change, trigger event
             $(countInput).trigger("change");
         });
+    });
+
+    $("#customer-account-login-providers a").click(function () {
+        // Prevent double-submit, see also https://github.com/pretix/pretix/issues/5836
+        $(this).addClass("disabled");
     });
 });
 

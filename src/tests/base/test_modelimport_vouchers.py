@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -170,7 +170,7 @@ def test_price_mode_validation(event, item, user):
         import_vouchers.apply(
             args=(event.pk, inputfile_factory().id, settings, 'en', user.pk)
         ).get()
-    assert 'It is pointless to set a value without a price mode.' in str(excinfo.value)
+    assert 'It is pointless to set a value without a price effect.' in str(excinfo.value)
 
     settings['price_mode'] = 'static:percent'
     import_vouchers.apply(

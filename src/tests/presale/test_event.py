@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -36,6 +36,7 @@
 import datetime
 import re
 from decimal import Decimal
+from importlib import import_module
 from json import loads
 from zoneinfo import ZoneInfo
 
@@ -46,6 +47,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils.timezone import now
 from django_scopes import scopes_disabled
+from freezegun import freeze_time
 from tests.base import SoupTest
 from tests.testdummy.signals import FoobarSalesChannel
 
@@ -69,7 +71,7 @@ class EventTestMixin:
             live=True,
         )
         self.user = User.objects.create_user('dummy@dummy.dummy', 'dummy')
-        t = Team.objects.create(organizer=self.orga, can_change_event_settings=True)
+        t = Team.objects.create(organizer=self.orga, all_event_permissions=True)
         t.members.add(self.user)
         t.limit_events.add(self.event)
 
@@ -78,6 +80,34 @@ class EventMiddlewareTest(EventTestMixin, SoupTest):
     def test_event_header(self):
         doc = self.get_doc('/%s/%s/' % (self.orga.slug, self.event.slug))
         self.assertIn(str(self.event.name), doc.find("h1").text)
+
+    def test_no_session_cookie_set_on_event_index_view(self):
+        resp = self.client.get('/%s/%s/' % (self.orga.slug, self.event.slug))
+        self.assertEqual(resp.status_code, 200)
+        assert settings.SESSION_COOKIE_NAME not in self.client.cookies
+
+    def test_no_cart_session_added_on_event_index_view(self):
+        # Make sure a session is present by doing a cart op on another event
+        event2 = Event.objects.create(
+            organizer=self.orga, name='30C3b', slug='30c3b',
+            date_from=datetime.datetime(now().year + 1, 12, 26, 14, 0, tzinfo=datetime.timezone.utc),
+            live=True,
+        )
+        self.client.post('/%s/%s/cart/add' % (self.orga.slug, event2.slug), {
+            'item_%d' % 1337: '1',  # item does not need to exist
+            'ajax': 1
+        })
+        assert settings.SESSION_COOKIE_NAME in self.client.cookies
+
+        # Visit shop, make sure no session is created
+        resp = self.client.get('/%s/%s/' % (self.orga.slug, self.event.slug))
+        self.assertEqual(resp.status_code, 200)
+
+        SessionStore = import_module(settings.SESSION_ENGINE).SessionStore
+        session = SessionStore(self.client.cookies[settings.SESSION_COOKIE_NAME].value).load()
+        assert set(session.keys()) == {
+            f"current_cart_event_{event2.pk}", "carts"
+        }
 
     def test_not_found(self):
         resp = self.client.get('/%s/%s/' % ('foo', 'bar'))
@@ -271,6 +301,48 @@ class ItemDisplayTest(EventTestMixin, SoupTest):
             Item.objects.create(event=self.event, name='Early-bird ticket', category=c, default_price=0)
         resp = self.client.get('/%s/%s/' % (self.orga.slug, self.event.slug))
         self.assertNotIn("Early-bird", resp.rendered_content)
+
+    def tiered_availability_by_date_and_quota(self, q1_size, q2_size, time_offset, expected_phase):
+        current_time = now()
+
+        with scopes_disabled():
+            q1 = Quota.objects.create(event=self.event, name='Phase 1', size=q1_size)
+            item1 = Item.objects.create(
+                event=self.event,
+                name='Phase 1',
+                default_price=0,
+                available_from=current_time,
+                available_until=current_time + datetime.timedelta(days=1),
+                available_from_mode=Item.UNAVAIL_MODE_HIDDEN,
+                available_until_mode=Item.UNAVAIL_MODE_HIDDEN,
+                hidden_if_item_available_mode=Item.UNAVAIL_MODE_HIDDEN,
+            )
+            q1.items.add(item1)
+            q2 = Quota.objects.create(event=self.event, name='Phase 2', size=q2_size)
+            item2 = Item.objects.create(
+                event=self.event,
+                name='Phase 2',
+                default_price=0,
+                available_from=current_time + datetime.timedelta(days=0),
+                available_until=current_time + datetime.timedelta(days=2),
+                available_from_mode=Item.UNAVAIL_MODE_HIDDEN,
+                available_until_mode=Item.UNAVAIL_MODE_HIDDEN,
+                hidden_if_item_available_mode=Item.UNAVAIL_MODE_HIDDEN,
+                hidden_if_item_available=item1
+            )
+            q2.items.add(item2)
+            with freeze_time(current_time + time_offset):
+                resp = self.client.get('/%s/%s/' % (self.orga.slug, self.event.slug))
+                self.assertIn(expected_phase, resp.rendered_content)
+
+    def test_tiered_availability_by_date_and_quota_phase1_available(self):
+        self.tiered_availability_by_date_and_quota(1, 1, datetime.timedelta(seconds=1), "Phase 1")
+
+    def test_tiered_availability_by_date_and_quota_phase1_sold_out(self):
+        self.tiered_availability_by_date_and_quota(0, 1, datetime.timedelta(seconds=1), "Phase 2")
+
+    def test_tiered_availability_by_date_and_quota_phase1_timed_out(self):
+        self.tiered_availability_by_date_and_quota(1, 1, datetime.timedelta(days=1, hours=1), "Phase 2")
 
     def test_subevents_inactive_unknown(self):
         self.event.has_subevents = True
@@ -1090,6 +1162,65 @@ class WaitingListTest(EventTestMixin, SoupTest):
         assert wle.voucher is None
         assert wle.locale == 'en'
 
+    def test_initial_selection(self):
+        with scopes_disabled():
+            cat = ItemCategory.objects.create(event=self.event, name='Tickets')
+            self.item.category = cat
+            self.item.save()
+
+            item2 = Item.objects.create(
+                event=self.event, name='VIP ticket',
+                default_price=Decimal('25.00'),
+                active=True, category=cat,
+            )
+            self.q.items.add(item2)
+
+        response = self.client.get(
+            '/%s/%s/waitinglist/?item=%d' % (
+                self.orga.slug, self.event.slug, item2.pk
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        doc = BeautifulSoup(response.render().content, "lxml")
+
+        select = doc.find('select', {'name': 'itemvar'})
+        optgroup = select.find('optgroup')
+        self.assertIsNotNone(optgroup, 'Choices should be grouped by category')
+        self.assertEqual(optgroup['label'], 'Tickets')
+
+        selected = select.find_all('option', selected=True)
+        self.assertEqual(len(selected), 1, 'Exactly one option should be pre-selected')
+        self.assertEqual(selected[0]['value'], str(item2.pk))
+
+    def test_initial_selection_with_variation(self):
+        with scopes_disabled():
+            cat = ItemCategory.objects.create(event=self.event, name='Tickets')
+            self.item.category = cat
+            self.item.has_variations = True
+            self.item.save()
+
+            var1 = ItemVariation.objects.create(item=self.item, value='Standard')
+            var2 = ItemVariation.objects.create(item=self.item, value='Premium')
+            self.q.variations.add(var1, var2)
+
+        response = self.client.get(
+            '/%s/%s/waitinglist/?item=%d&var=%d' % (
+                self.orga.slug, self.event.slug,
+                self.item.pk, var2.pk,
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        doc = BeautifulSoup(response.render().content, "lxml")
+
+        select = doc.find('select', {'name': 'itemvar'})
+        optgroup = select.find('optgroup')
+        self.assertIsNotNone(optgroup, 'Choices should be grouped by category')
+        self.assertEqual(optgroup['label'], 'Tickets')
+
+        selected = select.find_all('option', selected=True)
+        self.assertEqual(len(selected), 1, 'Exactly one option should be pre-selected')
+        self.assertEqual(selected[0]['value'], '%d-%d' % (self.item.pk, var2.pk))
+
     def test_subevent_valid(self):
         with scopes_disabled():
             self.event.has_subevents = True
@@ -1621,7 +1752,7 @@ class EventLocaleTest(EventTestMixin, SoupTest):
             '/%s/%s/' % (self.orga.slug, self.event.slug)
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn('Thu, Dec. 26th,', response.rendered_content)
+        self.assertIn('Thu, Dec. 26,', response.rendered_content)
         self.assertIn('14:00', response.rendered_content)
 
     def test_english_region_US(self):
@@ -1631,7 +1762,7 @@ class EventLocaleTest(EventTestMixin, SoupTest):
             '/%s/%s/' % (self.orga.slug, self.event.slug)
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn('Thu, Dec. 26th,', response.rendered_content)
+        self.assertIn('Thu, Dec. 26,', response.rendered_content)
         self.assertIn('2 p.m.', response.rendered_content)
 
     def test_german_region_US(self):

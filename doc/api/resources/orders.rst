@@ -41,6 +41,7 @@ expires                               datetime                   The order will 
 payment_date                          date                       **DEPRECATED AND INACCURATE** Date of payment receipt
 payment_provider                      string                     **DEPRECATED AND INACCURATE** Payment provider used for this order
 total                                 money (string)             Total value of this order
+tax_rounding_mode                     string                     Tax rounding mode, see :ref:`algorithms-rounding`
 comment                               string                     Internal comment on this order
 api_meta                              object                     Meta data for that order. Only available through API, no guarantees
                                                                  on the content structure. You can use this to save references to your system.
@@ -65,11 +66,16 @@ invoice_address                       object                     Invoice address
 ├ state                               string                     Customer state (ISO 3166-2 code). Only supported in
                                                                  AU, BR, CA, CN, MY, MX, and US.
 ├ internal_reference                  string                     Customer's internal reference to be printed on the invoice
+
 ├ custom_field                        string                     Custom invoice address field
 ├ vat_id                              string                     Customer VAT ID
-└ vat_id_validated                    string                     ``true``, if the VAT ID has been validated against the
+├ vat_id_validated                    string                     ``true``, if the VAT ID has been validated against the
                                                                  EU VAT service and validation was successful. This only
                                                                  happens in rare cases.
+├ transmission_type                   string                     Transmission channel for invoice (see also :ref:`rest-transmission-types`).
+                                                                 Defaults to ``email``.
+└ transmission_info                   object                     Transmission-channel specific information (or ``null``).
+                                                                 See also :ref:`rest-transmission-types`.
 positions                             list of objects            List of order positions (see below). By default, only
                                                                  non-canceled positions are included.
 fees                                  list of objects            List of fees included in the order total. By default, only
@@ -111,6 +117,8 @@ cancellation_date                     datetime                   Time of order c
                                                                  reliable for orders that have been cancelled,
                                                                  reactivated and cancelled again.
 plugin_data                           object                     Additional data added by plugins.
+use_gift_cards                        list of strings            List of unique gift card secrets that are used to pay
+                                                                 for this order.
 ===================================== ========================== =======================================================
 
 
@@ -141,6 +149,18 @@ plugin_data                           object                     Additional data
 .. versionchanged:: 2025.2
 
    The ``plugin_data`` attribute has been added.
+
+.. versionchanged:: 2025.6
+
+   The ``invoice_address.transmission_type`` and ``invoice_address.transmission_info`` attributes have been added.
+
+.. versionchanged:: 2025.10
+
+   The ``tax_rounding_mode`` attribute has been added.
+
+.. versionchanged:: 2026.03
+
+   The ``use_gift_cards`` attribute has been added.
 
 .. _order-position-resource:
 
@@ -349,6 +369,7 @@ List of all orders
             "payment_provider": "banktransfer",
             "fees": [],
             "total": "23.00",
+            "tax_rounding_mode": "line",
             "comment": "",
             "custom_followup_at": null,
             "checkin_attention": false,
@@ -368,7 +389,9 @@ List of all orders
                 "state": "",
                 "internal_reference": "",
                 "vat_id": "EU123456789",
-                "vat_id_validated": false
+                "vat_id_validated": false,
+                "transmission_type": "email",
+                "transmission_info": {}
             },
             "positions": [
               {
@@ -407,6 +430,7 @@ List of all orders
                 "seat": null,
                 "checkins": [
                   {
+                    "id": 1337,
                     "list": 44,
                     "type": "entry",
                     "gate": null,
@@ -590,6 +614,7 @@ Fetching individual orders
         "payment_provider": "banktransfer",
         "fees": [],
         "total": "23.00",
+        "tax_rounding_mode": "line",
         "comment": "",
         "api_meta": {},
         "custom_followup_at": null,
@@ -610,7 +635,9 @@ Fetching individual orders
             "state": "",
             "internal_reference": "",
             "vat_id": "EU123456789",
-            "vat_id_validated": false
+            "vat_id_validated": false,
+            "transmission_type": "email",
+            "transmission_info": {}
         },
         "positions": [
           {
@@ -649,6 +676,7 @@ Fetching individual orders
             "seat": null,
             "checkins": [
               {
+                "id": 1337,
                 "list": 44,
                 "type": "entry",
                 "gate": null,
@@ -965,8 +993,6 @@ Creating orders
 
        * does not support file upload questions
 
-       * does not support redeeming gift cards
-
        * does not support or validate memberships
 
 
@@ -996,6 +1022,7 @@ Creating orders
      provider will not be called to do anything about this (i.e. if you pass a bank account to a debit provider, *no*
      charge will be created), this is just informative in case you *handled the payment already*.
    * ``payment_date`` (optional) – Date and time of the completion of the payment.
+   * ``tax_rounding_mode`` (optional)
    * ``comment`` (optional)
    * ``custom_followup_at`` (optional)
    * ``checkin_attention`` (optional)
@@ -1015,8 +1042,10 @@ Creating orders
       * ``internal_reference``
       * ``vat_id``
       * ``vat_id_validated`` (optional) – If you need support for reverse charge (rarely the case), you need to check
-         yourself if the passed VAT ID is a valid EU VAT ID. In that case, set this to ``true``. Only valid VAT IDs will
-         trigger reverse charge taxation. Don't forget to set ``is_business`` as well!
+        yourself if the passed VAT ID is a valid EU VAT ID. In that case, set this to ``true``. Only valid VAT IDs will
+        trigger reverse charge taxation. Don't forget to set ``is_business`` as well!
+     * ``transmission_type`` (optional, defaults to ``email``)
+     * ``transmission_info`` (optional, see also :ref:`rest-transmission-types`)
 
    * ``positions``
 
@@ -1041,6 +1070,7 @@ Creating orders
       * ``valid_until`` (optional, if both ``valid_from`` and ``valid_until`` are **missing** (not ``null``) the availability will be computed from the given product)
       * ``requested_valid_from`` (optional, can be set **instead** of ``valid_from`` and ``valid_until`` to signal a user choice for the start time that may or may not be respected)
       * ``use_reusable_medium`` (optional, causes the new ticket to take over the given reusable medium, identified by its ID)
+      * ``discount`` (optional, only possible if ``price`` is set; attention: if this is set to not-``null`` on any position, automatic calculation of discounts will not run)
       * ``answers``
 
         * ``question``
@@ -1069,6 +1099,14 @@ Creating orders
      whether these emails are enabled for certain sales channels. If set to ``null``, behavior will be controlled by pretix'
      settings based on the sales channels (added in pretix 4.7). Defaults to ``false``.
      Used to be ``send_mail`` before pretix 3.14.
+   * ``use_gift_cards`` (optional) The provided gift cards will be used to pay for this order. They will be debited and
+     all the necessary payment records for these transactions will be created. The gift cards will be used in sequence to
+     pay for the order. Processing of the gift cards stops as soon as the order is payed for. All gift card transactions
+     are listed under ``payments`` in the response.
+     This option can only be used with orders that are in the pending state.
+     The ``use_gift_cards`` attribute can not be combined with ``payment_info`` and ``payment_provider`` fields. If the
+     order isn't completely paid after its creation with ``use_gift_cards``, then a subsequent request to the payment
+     endpoint is needed.
 
    If you want to use add-on products, you need to set the ``positionid`` fields of all positions manually
    to incrementing integers starting with ``1``. Then, you can reference one of these
@@ -1617,6 +1655,7 @@ List of all order positions
             "blocked": null,
             "checkins": [
               {
+                "id": 1337,
                 "list": 44,
                 "type": "entry",
                 "gate": null,
@@ -1692,6 +1731,56 @@ List of all order positions
    :statuscode 401: Authentication failure
    :statuscode 403: The requested organizer/event does not exist **or** you have no permission to view this resource.
 
+.. http:get:: /api/v1/organizers/(organizer)/orderpositions/
+
+   Returns a list of all order positions within all events of a given organizer (with sufficient access permissions).
+
+   The supported query parameters and output format of this endpoint are almost identical to those of the list endpoint
+   within an event.
+   The only changes are that responses also contain the ``event`` attribute in each result and that the 'pdf_data'
+   parameter is not supported.
+
+   **Example request**:
+
+   .. sourcecode:: http
+
+      GET /api/v1/organizers/bigevents/orderpositions/ HTTP/1.1
+      Host: pretix.eu
+      Accept: application/json, text/javascript
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      HTTP/1.1 200 OK
+      Vary: Accept
+      Content-Type: application/json
+      X-Page-Generated: 2017-12-01T10:00:00Z
+
+      {
+        "count": 1,
+        "next": null,
+        "previous": null,
+        "results": [
+          {
+            "id:": 23442
+            "event": "sampleconf",
+            "order": "ABC12",
+            "positionid": 1,
+            "canceled": false,
+            "item": 1345,
+            ...
+          }
+        ]
+      }
+
+   :param organizer: The ``slug`` field of the organizer to fetch
+   :statuscode 200: no error
+   :statuscode 401: Authentication failure
+   :statuscode 403: The requested organizer/event does not exist **or** you have no permission to view this resource.
+
+
+
 Fetching individual positions
 -----------------------------
 
@@ -1745,6 +1834,7 @@ Fetching individual positions
         "seat": null,
         "checkins": [
           {
+            "id": 1337,
             "list": 44,
             "type": "entry",
             "gate": null,
@@ -1926,6 +2016,7 @@ Manipulating individual positions
 
       (Full order position resource, see above.)
 
+   :query boolean check_quotas: Whether to check quotas before committing item changes, default is ``true``
    :param organizer: The ``slug`` field of the organizer of the event
    :param event: The ``slug`` field of the event
    :param id: The ``id`` field of the order position to update
@@ -2005,6 +2096,7 @@ Manipulating individual positions
 
       (Full order position resource, see above.)
 
+   :query boolean check_quotas: Whether to check quotas before creating the new position, default is ``true``
    :param organizer: The ``slug`` field of the organizer of the event
    :param event: The ``slug`` field of the event
 
@@ -2291,6 +2383,7 @@ otherwise, such as splitting an order or changing fees.
 
       (Full order position resource, see above.)
 
+   :query boolean check_quotas: Whether to check quotas before patching or creating positions, default is ``true``
    :param organizer: The ``slug`` field of the organizer of the event
    :param event: The ``slug`` field of the event
    :param code: The ``code`` field of the order to update
@@ -2486,6 +2579,7 @@ Order payment endpoints
 
       {
         "amount": "23.00",
+        "comment": "Overpayment",
         "mark_canceled": false
       }
 

@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -49,6 +49,7 @@ from django.db.models import (
     Case, Exists, F, Max, Min, OuterRef, Prefetch, Q, Value, When,
 )
 from django.db.models.functions import Coalesce, Greatest
+from django.dispatch.dispatcher import NO_RECEIVERS
 from django.http import Http404, HttpResponse, QueryDict
 from django.templatetags.static import static
 from django.utils.decorators import method_decorator
@@ -76,6 +77,7 @@ from pretix.helpers.thumb import get_thumbnail
 from pretix.multidomain.urlreverse import build_absolute_uri, eventreverse
 from pretix.presale.forms.organizer import EventListFilterForm
 from pretix.presale.ical import get_public_ical
+from pretix.presale.signals import filter_subevents
 from pretix.presale.views import OrganizerViewMixin
 
 
@@ -561,16 +563,56 @@ def add_events_for_days(request, baseqs, before, after, ebd, timezones):
             })
 
 
-def add_subevents_for_days(qs, before, after, ebd, timezones, event=None, cart_namespace=None, voucher=None):
+def filter_subevents_with_plugins(subevents, sales_channel=None):
+    # Special-case of GlobalSignal.send_chained() that only sends subevents that have the plugin enabled
+    # and then mixes the results back together.
+    from pretix.base.signals import (
+        _populate_app_cache, app_cache, get_defining_app, is_app_active,
+    )
+
+    if not filter_subevents.receivers or filter_subevents.sender_receivers_cache.get(None) is NO_RECEIVERS:
+        return subevents
+
+    if not app_cache:
+        _populate_app_cache()
+
+    for receiver in filter_subevents._live_receivers(None)[0]:
+        app = get_defining_app(receiver)
+        event_state = {}
+
+        def app_active(event):
+            if event.pk not in event_state:
+                event_state[event.pk] = is_app_active(event, app, allow_legacy_plugins=True)
+            return event_state[event.pk]
+
+        subevents_passed_to_receiver = [
+            s for s in subevents if app_active(s.event)
+        ]
+        response = receiver(
+            signal=filter_subevents,
+            sender=None,
+            subevents=subevents_passed_to_receiver,
+            sales_channel=sales_channel,
+        )
+        subevents = [
+            s for s in subevents if s in response or s not in subevents_passed_to_receiver
+        ]
+
+    return subevents
+
+
+def add_subevents_for_days(qs, before, after, ebd, timezones, sales_channel, event=None, cart_namespace=None,
+                           voucher=None):
     qs = qs.filter(active=True, is_public=True).filter(
         Q(Q(date_to__gte=before) & Q(date_from__lte=after)) |
         Q(Q(date_to__isnull=True) & Q(date_from__gte=before) & Q(date_from__lte=after))
     ).order_by(
         'date_from'
     )
+    subevents = filter_subevents_with_plugins(list(qs), sales_channel)
 
     quotas_to_compute = []
-    for se in qs:
+    for se in subevents:
         if se.presale_is_running:
             quotas_to_compute += se.active_quotas
             for q in se.active_quotas:
@@ -588,7 +630,7 @@ def add_subevents_for_days(qs, before, after, ebd, timezones, event=None, cart_n
         qa.compute(allow_cache=True)
         qcache.update(qa.results)
 
-    for se in qs:
+    for se in subevents:
         if qcache:
             se._quota_cache = qcache
         if event is not None:  # save database lookup later
@@ -726,7 +768,7 @@ class CalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
             raise Http404()
 
         tz = get_current_timezone()
-        before = datetime(self.year, self.month, 1, 0, 0, 0, tzinfo=tz) - timedelta(days=1)
+        before = datetime(self.year, self.month, 1, 23, 59, 59, tzinfo=tz) - timedelta(days=1)
         after = datetime(self.year, self.month, ndays, 0, 0, 0, tzinfo=tz) + timedelta(days=1)
 
         ctx['date'] = date(self.year, self.month, 1)
@@ -763,24 +805,31 @@ class CalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
         ).filter(
             Q(all_sales_channels=True) | Q(limit_sales_channels=self.request.sales_channel),
         ), before, after, ebd, timezones)
-        add_subevents_for_days(filter_qs_by_attr(SubEvent.annotated(SubEvent.objects.filter(
-            Q(event__all_sales_channels=True) |
-            Q(event__limit_sales_channels=self.request.sales_channel),
-            event__organizer=self.request.organizer,
-            event__is_public=True,
-            event__live=True,
-        ).prefetch_related(
-            Prefetch(
-                'event',
-                queryset=Event.objects.prefetch_related(
-                    '_settings_objects',
-                    Prefetch(
-                        'organizer',
-                        queryset=Organizer.objects.prefetch_related('_settings_objects')
+        add_subevents_for_days(
+            filter_qs_by_attr(SubEvent.annotated(SubEvent.objects.filter(
+                Q(event__all_sales_channels=True) |
+                Q(event__limit_sales_channels=self.request.sales_channel),
+                event__organizer=self.request.organizer,
+                event__is_public=True,
+                event__live=True,
+            ).prefetch_related(
+                Prefetch(
+                    'event',
+                    queryset=Event.objects.prefetch_related(
+                        '_settings_objects',
+                        Prefetch(
+                            'organizer',
+                            queryset=Organizer.objects.prefetch_related('_settings_objects')
+                        )
                     )
                 )
-            )
-        ), self.request.sales_channel), self.request).using(settings.DATABASE_REPLICA), before, after, ebd, timezones)
+            ), self.request.sales_channel), self.request).using(settings.DATABASE_REPLICA),
+            before=before,
+            after=after,
+            ebd=ebd,
+            timezones=timezones,
+            sales_channel=self.request.sales_channel,
+        )
         self._multiple_timezones = len(timezones) > 1
         return ebd
 
@@ -805,7 +854,7 @@ class WeekCalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
         tz = get_current_timezone()
         week = isoweek.Week(self.year, self.week)
         before = datetime(
-            week.monday().year, week.monday().month, week.monday().day, 0, 0, 0, tzinfo=tz,
+            week.monday().year, week.monday().month, week.monday().day, 23, 59, 59, tzinfo=tz,
         ) - timedelta(days=1)
         after = datetime(
             week.sunday().year, week.sunday().month, week.sunday().day, 0, 0, 0, tzinfo=tz,
@@ -860,24 +909,31 @@ class WeekCalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
         ).filter(
             Q(all_sales_channels=True) | Q(limit_sales_channels=self.request.sales_channel),
         ), before, after, ebd, timezones)
-        add_subevents_for_days(filter_qs_by_attr(SubEvent.annotated(SubEvent.objects.filter(
-            Q(event__all_sales_channels=True) |
-            Q(event__limit_sales_channels=self.request.sales_channel),
-            event__organizer=self.request.organizer,
-            event__is_public=True,
-            event__live=True,
-        ).prefetch_related(
-            Prefetch(
-                'event',
-                queryset=Event.objects.prefetch_related(
-                    '_settings_objects',
-                    Prefetch(
-                        'organizer',
-                        queryset=Organizer.objects.prefetch_related('_settings_objects')
+        add_subevents_for_days(
+            filter_qs_by_attr(SubEvent.annotated(SubEvent.objects.filter(
+                Q(event__all_sales_channels=True) |
+                Q(event__limit_sales_channels=self.request.sales_channel),
+                event__organizer=self.request.organizer,
+                event__is_public=True,
+                event__live=True,
+            ).prefetch_related(
+                Prefetch(
+                    'event',
+                    queryset=Event.objects.prefetch_related(
+                        '_settings_objects',
+                        Prefetch(
+                            'organizer',
+                            queryset=Organizer.objects.prefetch_related('_settings_objects')
+                        )
                     )
                 )
-            )
-        ), self.request.sales_channel), self.request).using(settings.DATABASE_REPLICA), before, after, ebd, timezones)
+            ), self.request.sales_channel), self.request).using(settings.DATABASE_REPLICA),
+            before=before,
+            after=after,
+            ebd=ebd,
+            timezones=timezones,
+            sales_channel=self.request.sales_channel,
+        )
         self._multiple_timezones = len(timezones) > 1
         return ebd
 
@@ -945,7 +1001,7 @@ class DayCalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
 
         tz = get_current_timezone()
         before = datetime(
-            self.date.year, self.date.month, self.date.day, 0, 0, 0, tzinfo=tz,
+            self.date.year, self.date.month, self.date.day, 23, 59, 59, tzinfo=tz,
         ) - timedelta(days=1)
         after = datetime(
             self.date.year, self.date.month, self.date.day, 0, 0, 0, tzinfo=tz,
@@ -976,7 +1032,7 @@ class DayCalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
             return ctx
 
         events = ebd[self.date]
-        shortest_duration = self._get_shortest_duration(events).total_seconds() // 60
+        shortest_duration = max(self._get_shortest_duration(events).total_seconds() // 60, 1)
         # pick the next biggest tick_duration based on shortest_duration, max. 180 minutes
         tick_duration = next((d for d in [5, 10, 15, 30, 60, 120, 180] if d >= shortest_duration), 180)
 
@@ -1211,24 +1267,31 @@ class DayCalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
         ).filter(
             Q(all_sales_channels=True) | Q(limit_sales_channels=self.request.sales_channel),
         ), before, after, ebd, timezones)
-        add_subevents_for_days(filter_qs_by_attr(SubEvent.annotated(SubEvent.objects.filter(
-            Q(event__all_sales_channels=True) |
-            Q(event__limit_sales_channels=self.request.sales_channel),
-            event__organizer=self.request.organizer,
-            event__is_public=True,
-            event__live=True,
-        ).prefetch_related(
-            Prefetch(
-                'event',
-                queryset=Event.objects.prefetch_related(
-                    '_settings_objects',
-                    Prefetch(
-                        'organizer',
-                        queryset=Organizer.objects.prefetch_related('_settings_objects')
+        add_subevents_for_days(
+            filter_qs_by_attr(SubEvent.annotated(SubEvent.objects.filter(
+                Q(event__all_sales_channels=True) |
+                Q(event__limit_sales_channels=self.request.sales_channel),
+                event__organizer=self.request.organizer,
+                event__is_public=True,
+                event__live=True,
+            ).prefetch_related(
+                Prefetch(
+                    'event',
+                    queryset=Event.objects.prefetch_related(
+                        '_settings_objects',
+                        Prefetch(
+                            'organizer',
+                            queryset=Organizer.objects.prefetch_related('_settings_objects')
+                        )
                     )
                 )
-            )
-        ), self.request.sales_channel), self.request).using(settings.DATABASE_REPLICA), before, after, ebd, timezones)
+            ), self.request.sales_channel), self.request).using(settings.DATABASE_REPLICA),
+            before=before,
+            after=after,
+            ebd=ebd,
+            timezones=timezones,
+            sales_channel=self.request.sales_channel,
+        )
         self._multiple_timezones = len(timezones) > 1
         return ebd
 
@@ -1237,6 +1300,8 @@ class DayCalendarView(OrganizerViewMixin, EventListMixin, TemplateView):
 class OrganizerIcalDownload(OrganizerViewMixin, View):
     def get(self, request, *args, **kwargs):
         cutoff = now() - timedelta(days=31)
+        # generally limit to 1000 entries as this seems to be a limitation on ics-files for some calendar software
+        limit = 1000
         events = list(
             filter_qs_by_attr(
                 self.request.organizer.events.filter(
@@ -1255,7 +1320,7 @@ class OrganizerIcalDownload(OrganizerViewMixin, View):
                     'organizer',
                     queryset=Organizer.objects.prefetch_related('_settings_objects')
                 )
-            )
+            )[:limit]
         )
         events += list(
             filter_qs_by_attr(
@@ -1283,8 +1348,11 @@ class OrganizerIcalDownload(OrganizerViewMixin, View):
                 )
             ).order_by(
                 'date_from'
-            )
+            )[:limit]
         )
+        if len(events) > limit:
+            events.sort(key=lambda e: e.date_from)
+            events = events[:limit]
 
         if 'locale' in request.GET and request.GET.get('locale') in dict(settings.LANGUAGES):
             with language(request.GET.get('locale'), self.request.organizer.settings.region):

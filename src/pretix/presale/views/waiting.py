@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -66,22 +66,27 @@ class WaitingView(EventViewMixin, FormView):
                 if customer else None
             ),
         )
-        choices = []
+        groups = {}
         for i in items:
             if not i.allow_waitinglist:
                 continue
+
+            category_name = str(i.category.name) if i.category else ''
+            group = groups.setdefault(category_name, [])
 
             if i.has_variations:
                 for v in i.available_variations:
                     if v.cached_availability[0] == Quota.AVAILABILITY_OK:
                         continue
-                    choices.append((f'{i.pk}-{v.pk}', f'{i.name} – {v.value}'))
+                    group.append((f'{i.pk}-{v.pk}', f'{i.name} – {v.value}'))
 
             else:
                 if i.cached_availability[0] == Quota.AVAILABILITY_OK:
                     continue
-                choices.append((f'{i.pk}', f'{i.name}'))
-        return choices
+                group.append((f'{i.pk}', f'{i.name}'))
+
+        # Remove categories where all items were available (no waiting list choices)
+        return [(cat, choices) for cat, choices in groups.items() if choices]
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

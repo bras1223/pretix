@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -34,18 +34,20 @@
 # License for the specific language governing permissions and limitations under the License.
 
 from collections import defaultdict
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
 import bleach
-import dateutil.parser
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.html import escape, format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _, pgettext_lazy
 from i18nfield.strings import LazyI18nString
 
+from pretix.base.datasync.datasync import datasync_providers
 from pretix.base.logentrytypes import (
     DiscountLogEntryType, EventLogEntryType, ItemCategoryLogEntryType,
     ItemLogEntryType, LogEntryType, OrderLogEntryType, QuestionLogEntryType,
@@ -169,6 +171,12 @@ class OrderFeeAdded(OrderChangeLogEntryType):
 
 
 @log_entry_types.new()
+class OrderRecomputed(OrderChangeLogEntryType):
+    action_type = 'pretix.event.order.changed.recomputed'
+    plain = _('Taxes and rounding have been recomputed')
+
+
+@log_entry_types.new()
 class OrderFeeChanged(OrderChangeLogEntryType):
     action_type = 'pretix.event.order.changed.feevalue'
 
@@ -240,7 +248,7 @@ class OrderValidFromChanged(OrderChangeLogEntryType):
     def display_prefixed(self, event: Event, logentry: LogEntry, data):
         return _('The validity start date for position #{posid} has been changed to {value}.').format(
             posid=data.get('positionid', '?'),
-            value=date_format(dateutil.parser.parse(data.get('new_value')), 'SHORT_DATETIME_FORMAT') if data.get(
+            value=date_format(datetime.fromisoformat(data.get('new_value')), 'SHORT_DATETIME_FORMAT') if data.get(
                 'new_value') else '–'
         )
 
@@ -252,7 +260,7 @@ class OrderValidUntilChanged(OrderChangeLogEntryType):
     def display_prefixed(self, event: Event, logentry: LogEntry, data):
         return _('The validity end date for position #{posid} has been changed to {value}.').format(
             posid=data.get('positionid', '?'),
-            value=date_format(dateutil.parser.parse(data.get('new_value')), 'SHORT_DATETIME_FORMAT') if data.get('new_value') else '–'
+            value=date_format(datetime.fromisoformat(data.get('new_value')), 'SHORT_DATETIME_FORMAT') if data.get('new_value') else '–'
         )
 
 
@@ -319,6 +327,14 @@ class OrderChangedSplitFrom(OrderLogEntryType):
         _('Denied scan of position #{posid} at {datetime} for list "{list}", type "{type}", error code "{errorcode}".'),
         _('Denied scan of position #{posid} for list "{list}", type "{type}", error code "{errorcode}".'),
     ),
+    'pretix.event.checkin.annulled': (
+        _('Annulled scan of position #{posid} at {datetime} for list "{list}", type "{type}".'),
+        _('Annulled scan of position #{posid} for list "{list}", type "{type}".'),
+    ),
+    'pretix.event.checkin.annulment.ignored': (
+        _('Ignored annulment of position #{posid} at {datetime} for list "{list}", type "{type}".'),
+        _('Ignored annulment of position #{posid} for list "{list}", type "{type}".'),
+    ),
     'pretix.control.views.checkin.reverted': _('The check-in of position #{posid} on list "{list}" has been reverted.'),
     'pretix.event.checkin.reverted': _('The check-in of position #{posid} on list "{list}" has been reverted.'),
 })
@@ -348,7 +364,7 @@ class CheckinErrorLogEntryType(OrderLogEntryType):
         data['posid'] = logentry.parsed_data.get('positionid', '?')
 
         if 'datetime' in data:
-            dt = dateutil.parser.parse(data.get('datetime'))
+            dt = datetime.fromisoformat(data.get('datetime'))
             if abs((logentry.datetime - dt).total_seconds()) > 5 or data.get('forced'):
                 if event:
                     data['datetime'] = date_format(dt.astimezone(event.timezone), "SHORT_DATETIME_FORMAT")
@@ -414,11 +430,56 @@ class OrderPrintLogEntryType(OrderLogEntryType):
         return _('Position #{posid} has been printed at {datetime} with type "{type}".').format(
             posid=data.get('positionid'),
             datetime=date_format(
-                dateutil.parser.parse(data["datetime"]).astimezone(logentry.event.timezone),
+                datetime.fromisoformat(data["datetime"]).astimezone(logentry.event.timezone),
                 "SHORT_DATETIME_FORMAT"
             ) if logentry.event else data["datetime"],
             type=dict(PrintLog.PRINT_TYPES)[data["type"]],
         )
+
+
+class OrderDataSyncLogEntryType(OrderLogEntryType):
+    def display(self, logentry, data):
+        try:
+            from pretix.base.datasync.datasync import datasync_providers
+            provider_class, meta = datasync_providers.get(identifier=data['provider'])
+            data['provider_display_name'] = provider_class.display_name
+        except (KeyError, AttributeError):
+            data['provider_display_name'] = data.get('provider')
+        return super().display(logentry, data)
+
+
+@log_entry_types.new_from_dict({
+    "pretix.event.order.data_sync.success": _("Data successfully transferred to {provider_display_name}."),
+})
+class OrderDataSyncSuccessLogEntryType(OrderDataSyncLogEntryType):
+    def display(self, logentry, data):
+        links = []
+        if data.get('provider') and data.get('objects'):
+            prov, meta = datasync_providers.get(identifier=data['provider'])
+            if prov:
+                for objs in data['objects'].values():
+                    links.append(", ".join(
+                        prov.get_external_link_html(logentry.event, obj['external_link_href'], obj['external_link_display_name'])
+                        for obj in objs
+                        if obj and obj.get('external_link_href') and obj.get('external_link_display_name')
+                    ))
+
+        return mark_safe(escape(super().display(logentry, data)) + "".join("<p>" + link + "</p>" for link in links))
+
+
+@log_entry_types.new_from_dict({
+    "pretix.event.order.data_sync.failed.config": _("Transferring data to {provider_display_name} failed due to invalid configuration:"),
+    "pretix.event.order.data_sync.failed.exceeded": _("Maximum number of retries exceeded while transferring data to {provider_display_name}:"),
+    "pretix.event.order.data_sync.failed.permanent": _("Error while transferring data to {provider_display_name}:"),
+    "pretix.event.order.data_sync.failed.internal": _("Internal error while transferring data to {provider_display_name}."),
+    "pretix.event.order.data_sync.failed.timeout": _("Internal error while transferring data to {provider_display_name}."),
+})
+class OrderDataSyncErrorLogEntryType(OrderDataSyncLogEntryType):
+    def display(self, logentry, data):
+        errmes = data["error"]
+        if not isinstance(errmes, list):
+            errmes = [errmes]
+        return mark_safe(escape(super().display(logentry, data)) + "".join("<p>" + escape(msg) + "</p>" for msg in errmes))
 
 
 @receiver(signal=logentry_display, dispatch_uid="pretixcontrol_logentry_display")
@@ -457,6 +518,7 @@ def pretixcontrol_orderposition_blocked_display(sender: Event, orderposition, bl
         'The order requires approval before it can continue to be processed.'),
     'pretix.event.order.approved': _('The order has been approved.'),
     'pretix.event.order.denied': _('The order has been denied (comment: "{comment}").'),
+    'pretix.event.order.vatid.validated': _('The customer VAT ID has been verified.'),
     'pretix.event.order.contact.changed': _('The email address has been changed from "{old_email}" '
                                             'to "{new_email}".'),
     'pretix.event.order.contact.confirmed': _(
@@ -467,8 +529,14 @@ def pretixcontrol_orderposition_blocked_display(sender: Event, orderposition, bl
     'pretix.event.order.customer.changed': _('The customer account has been changed.'),
     'pretix.event.order.locale.changed': _('The order locale has been changed.'),
     'pretix.event.order.invoice.generated': _('The invoice has been generated.'),
+    'pretix.event.order.invoice.failed': _('The invoice could not be generated.'),
     'pretix.event.order.invoice.regenerated': _('The invoice has been regenerated.'),
     'pretix.event.order.invoice.reissued': _('The invoice has been reissued.'),
+    'pretix.event.order.invoice.sent': _('The invoice {full_invoice_no} has been sent.'),
+    'pretix.event.order.invoice.sending_failed': _('The transmission of invoice {full_invoice_no} has failed.'),
+    'pretix.event.order.invoice.testmode_ignored': _('Invoice {full_invoice_no} has not been transmitted because '
+                                                     'the transmission provider does not support test mode invoices.'),
+    'pretix.event.order.invoice.retransmitted': _('The invoice {full_invoice_no} has been scheduled for retransmission.'),
     'pretix.event.order.comment': _('The order\'s internal comment has been updated.'),
     'pretix.event.order.custom_followup_at': _('The order\'s follow-up date has been updated.'),
     'pretix.event.order.checkin_attention': _('The order\'s flag to require attention at check-in has been '
@@ -481,6 +549,7 @@ def pretixcontrol_orderposition_blocked_display(sender: Event, orderposition, bl
     'pretix.event.order.email.error': _('Sending of an email has failed.'),
     'pretix.event.order.email.attachments.skipped': _('The email has been sent without attached tickets since they '
                                                       'would have been too large to be likely to arrive.'),
+    'pretix.event.order.email.invoice': _('An invoice email has been sent.'),
     'pretix.event.order.email.custom_sent': _('A custom email has been sent.'),
     'pretix.event.order.position.email.custom_sent': _('A custom email has been sent to an attendee.'),
     'pretix.event.order.email.download_reminder_sent': _('An email has been sent with a reminder that the ticket '
@@ -516,11 +585,12 @@ class CoreOrderLogEntryType(OrderLogEntryType):
 @log_entry_types.new_from_dict({
     'pretix.voucher.added': _('The voucher has been created.'),
     'pretix.voucher.sent': _('The voucher has been sent to {recipient}.'),
-    'pretix.voucher.added.waitinglist': _('The voucher has been created and sent to a person on the waiting list.'),
     'pretix.voucher.expired.waitinglist': _(
         'The voucher has been set to expire because the recipient removed themselves from the waiting list.'),
     'pretix.voucher.changed': _('The voucher has been changed.'),
     'pretix.voucher.deleted': _('The voucher has been deleted.'),
+    'pretix.voucher.carts.deleted': _('Cart positions including the voucher have been deleted.'),
+    'pretix.voucher.added.waitinglist': _('The voucher has been assigned to {email} through the waiting list.'),
 })
 class CoreVoucherLogEntryType(VoucherLogEntryType):
     pass
@@ -571,6 +641,7 @@ class TeamMembershipLogEntryType(LogEntryType):
     'pretix.team.member.added': _('{user} has been added to the team.'),
     'pretix.team.member.removed': _('{user} has been removed from the team.'),
     'pretix.team.invite.created': _('{user} has been invited to the team.'),
+    'pretix.team.invite.deleted': _('Invite for {user} has been deleted.'),
     'pretix.team.invite.resent': _('Invite for {user} has been resent.'),
 })
 class CoreTeamMembershipLogEntryType(TeamMembershipLogEntryType):
@@ -605,6 +676,14 @@ class UserSettingsChangedLogEntryType(LogEntryType):
         return text
 
 
+@log_entry_types.new_from_dict({
+    'pretix.user.email.changed': _('Your email address has been changed from {old_email} to {email}.'),
+    'pretix.user.email.confirmed': _('Your email address {email} has been confirmed.'),
+})
+class UserEmailChangedLogEntryType(LogEntryType):
+    pass
+
+
 class UserImpersonatedLogEntryType(LogEntryType):
     def display(self, logentry, data):
         return self.plain.format(data['other_email'])
@@ -628,6 +707,8 @@ class CoreUserImpersonatedLogEntryType(UserImpersonatedLogEntryType):
     'pretix.organizer.export.schedule.deleted': _('A scheduled export has been deleted.'),
     'pretix.organizer.export.schedule.executed': _('A scheduled export has been executed.'),
     'pretix.organizer.export.schedule.failed': _('A scheduled export has failed: {reason}.'),
+    'pretix.organizer.outgoingmails.retried': _('Failed emails have been scheduled to be retried.'),
+    'pretix.organizer.outgoingmails.aborted': _('Queued emails have been aborted.'),
     'pretix.giftcards.acceptance.added': _('Gift card acceptance for another organizer has been added.'),
     'pretix.giftcards.acceptance.removed': _('Gift card acceptance for another organizer has been removed.'),
     'pretix.giftcards.acceptance.acceptor.invited': _('A new gift card acceptor has been invited.'),
@@ -658,6 +739,7 @@ class CoreUserImpersonatedLogEntryType(UserImpersonatedLogEntryType):
     'pretix.customer.anonymized': _('The account has been disabled and anonymized.'),
     'pretix.customer.password.resetrequested': _('A new password has been requested.'),
     'pretix.customer.password.set': _('A new password has been set.'),
+    'pretix.customer.email.error': _('Sending of an email has failed.'),
     'pretix.reusable_medium.created': _('The reusable medium has been created.'),
     'pretix.reusable_medium.created.auto': _('The reusable medium has been created automatically.'),
     'pretix.reusable_medium.changed': _('The reusable medium has been changed.'),
@@ -691,6 +773,7 @@ class CoreUserImpersonatedLogEntryType(UserImpersonatedLogEntryType):
     'pretix.user.anonymized': _('This user has been anonymized.'),
     'pretix.user.oauth.authorized': _('The application "{application_name}" has been authorized to access your '
                                       'account.'),
+    'pretix.user.email.error': _('Sending of an email has failed.'),
     'pretix.control.auth.user.forgot_password.mail_sent': _('Password reset mail sent.'),
     'pretix.control.auth.user.forgot_password.recovered': _('The password has been reset.'),
     'pretix.control.auth.user.forgot_password.denied.repeated': _('A repeated password reset has been denied, as '
@@ -720,11 +803,33 @@ class CoreUserImpersonatedLogEntryType(UserImpersonatedLogEntryType):
     'pretix.giftcards.created': _('The gift card has been created.'),
     'pretix.giftcards.modified': _('The gift card has been changed.'),
     'pretix.giftcards.transaction.manual': _('A manual transaction has been performed.'),
+    'pretix.giftcards.transaction.payment': _('A payment has been performed.'),
+    'pretix.giftcards.transaction.refund': _('A refund has been performed. '),
     'pretix.team.token.created': _('The token "{name}" has been created.'),
     'pretix.team.token.deleted': _('The token "{name}" has been revoked.'),
+    'pretix.event.checkin.reset': _('The check-in and print log state has been reset.')
 })
 class CoreLogEntryType(LogEntryType):
     pass
+
+
+@log_entry_types.new_from_dict({
+    'pretix.organizer.plugins.enabled': _('The plugin has been enabled.'),
+    'pretix.organizer.plugins.disabled': _('The plugin has been disabled.'),
+})
+class OrganizerPluginStateLogEntryType(LogEntryType):
+    object_link_wrapper = _('Plugin {val}')
+
+    def get_object_link_info(self, logentry) -> Optional[dict]:
+        if 'plugin' in logentry.parsed_data:
+            app = app_cache.get(logentry.parsed_data['plugin'])
+            if app and hasattr(app, 'PretixPluginMeta'):
+                return {
+                    'href': reverse('control:organizer.settings.plugins', kwargs={
+                        'organizer': logentry.organizer.slug,
+                    }) + '#plugin_' + logentry.parsed_data['plugin'],
+                    'val': app.PretixPluginMeta.name
+                }
 
 
 @log_entry_types.new_from_dict({
@@ -798,6 +903,9 @@ class EventPluginStateLogEntryType(EventLogEntryType):
     'pretix.event.item.bundles.added': _('A bundled item has been added to this product.'),
     'pretix.event.item.bundles.removed': _('A bundled item has been removed from this product.'),
     'pretix.event.item.bundles.changed': _('A bundled item has been changed on this product.'),
+    'pretix.event.item.program_times.added': _('A program time has been added to this product.'),
+    'pretix.event.item.program_times.changed': _('A program time has been changed on this product.'),
+    'pretix.event.item.program_times.removed': _('A program time has been removed from this product.'),
 })
 class CoreItemLogEntryType(ItemLogEntryType):
     pass
@@ -877,7 +985,7 @@ class LegacyCheckinLogEntryType(OrderLogEntryType):
 
     def display(self, logentry, data):
         # deprecated
-        dt = dateutil.parser.parse(data.get('datetime'))
+        dt = datetime.fromisoformat(data.get('datetime'))
         tz = logentry.event.timezone
         dt_formatted = date_format(dt.astimezone(tz), "SHORT_DATETIME_FORMAT")
         if 'list' in data:

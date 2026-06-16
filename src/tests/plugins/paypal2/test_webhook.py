@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -42,7 +42,7 @@ def env():
         organizer=o, name='Dummy', slug='dummy', plugins='pretix.plugins.paypal2',
         date_from=now(), live=True
     )
-    t = Team.objects.create(organizer=event.organizer, can_view_orders=True, can_change_orders=True)
+    t = Team.objects.create(organizer=event.organizer, all_event_permissions=True)
     t.members.add(user)
     t.limit_events.add(event)
     o1 = Order.objects.create(

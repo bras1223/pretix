@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -132,7 +132,7 @@ class AllowIgnoreQuotaColumn(BooleanColumnMixin, ImportColumn):
 
 class PriceModeColumn(ImportColumn):
     identifier = 'price_mode'
-    verbose_name = gettext_lazy('Price mode')
+    verbose_name = gettext_lazy('Price effect')
     default_value = None
     initial = 'static:none'
 
@@ -147,7 +147,7 @@ class PriceModeColumn(ImportColumn):
         elif value in reverse:
             return reverse[value]
         else:
-            raise ValidationError(_("Could not parse {value} as a price mode, use one of {options}.").format(
+            raise ValidationError(_("Could not parse {value} as a price effect, use one of {options}.").format(
                 value=value, options=', '.join(d.keys())
             ))
 
@@ -162,7 +162,7 @@ class ValueColumn(DecimalColumnMixin, ImportColumn):
     def clean(self, value, previous_values):
         value = super().clean(value, previous_values)
         if value and previous_values.get("price_mode") == "none":
-            raise ValidationError(_("It is pointless to set a value without a price mode."))
+            raise ValidationError(_("It is pointless to set a value without a price effect."))
         return value
 
     def assign(self, value, obj: Voucher, **kwargs):

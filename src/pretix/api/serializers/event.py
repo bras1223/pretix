@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -50,6 +50,7 @@ from rest_framework.relations import SlugRelatedField
 from pretix.api.serializers import (
     CompatibleJSONField, SalesChannelMigrationMixin,
 )
+from pretix.api.serializers.fields import PluginsField
 from pretix.api.serializers.i18n import I18nAwareModelSerializer
 from pretix.api.serializers.settings import SettingsSerializer
 from pretix.base.models import (
@@ -61,6 +62,9 @@ from pretix.base.models.items import (
     ItemMetaProperty, SubEventItem, SubEventItemVariation,
 )
 from pretix.base.models.tax import CustomRulesValidator
+from pretix.base.plugins import (
+    PLUGIN_LEVEL_EVENT, PLUGIN_LEVEL_EVENT_ORGANIZER_HYBRID,
+)
 from pretix.base.services.seating import (
     SeatProtected, generate_seats, validate_plan_change,
 )
@@ -123,22 +127,6 @@ class SeatCategoryMappingField(Field):
             raise ValidationError('seat_category_mapping needs to be an object (str -> int).')
         return {
             'seat_category_mapping': data or {}
-        }
-
-
-class PluginsField(Field):
-
-    def to_representation(self, obj):
-        from pretix.base.plugins import get_all_plugins
-
-        return sorted([
-            p.module for p in get_all_plugins()
-            if not p.name.startswith('.') and getattr(p, 'visible', True) and p.module in obj.get_plugins()
-        ])
-
-    def to_internal_value(self, data):
-        return {
-            'plugins': data
         }
 
 
@@ -283,17 +271,28 @@ class EventSerializer(SalesChannelMigrationMixin, I18nAwareModelSerializer):
         from pretix.base.plugins import get_all_plugins
 
         plugins_available = {
-            p.module: p for p in get_all_plugins(self.instance)
+            p.module: p for p in get_all_plugins(event=self.instance)
             if not p.name.startswith('.') and getattr(p, 'visible', True)
         }
+        current_plugins = self.instance.get_plugins() if self.instance and self.instance.pk else []
         settings_holder = self.instance if self.instance and self.instance.pk else self.context['organizer']
 
+        allowed_levels = (PLUGIN_LEVEL_EVENT, PLUGIN_LEVEL_EVENT_ORGANIZER_HYBRID)
         for plugin in value.get('plugins'):
             if plugin not in plugins_available:
                 raise ValidationError(_('Unknown plugin: \'{name}\'.').format(name=plugin))
             if getattr(plugins_available[plugin], 'restricted', False):
                 if plugin not in settings_holder.settings.allowed_restricted_plugins:
                     raise ValidationError(_('Restricted plugin: \'{name}\'.').format(name=plugin))
+            level = getattr(plugins_available[plugin], 'level', PLUGIN_LEVEL_EVENT)
+            if level not in allowed_levels:
+                raise ValidationError('Plugin cannot be enabled on this level: \'{name}\'.'.format(name=plugin))
+
+            if level == PLUGIN_LEVEL_EVENT_ORGANIZER_HYBRID and plugin not in self.context['organizer'].get_plugins():
+                if plugin not in current_plugins:
+                    # Technically, this is allowed, but consumers might be confused if the API call doesn't do anything
+                    # so we prevent this change.
+                    raise ValidationError('Plugin should be enabled on organizer level first: \'{name}\'.'.format(name=plugin))
 
         return value
 
@@ -301,7 +300,7 @@ class EventSerializer(SalesChannelMigrationMixin, I18nAwareModelSerializer):
     def ignored_meta_properties(self):
         perm_holder = (self.context['request'].auth if isinstance(self.context['request'].auth, (Device, TeamAPIToken))
                        else self.context['request'].user)
-        if perm_holder.has_organizer_permission(self.context['request'].organizer, 'can_change_organizer_settings', request=self.context['request']):
+        if perm_holder.has_organizer_permission(self.context['request'].organizer, 'organizer.settings.general:write', request=self.context['request']):
             return []
         return [k for k, p in self.meta_properties.items() if p.protected]
 
@@ -446,7 +445,7 @@ class CloneEventSerializer(EventSerializer):
         date_admission = validated_data.pop('date_admission', None)
         new_event = super().create({**validated_data, 'plugins': None})
 
-        event = Event.objects.filter(slug=self.context['event'], organizer=self.context['organizer'].pk).first()
+        event = self.context['event']
         new_event.copy_data_from(event, skip_meta_data='meta_data' in validated_data)
 
         if plugins is not None:
@@ -562,7 +561,7 @@ class SubEventSerializer(I18nAwareModelSerializer):
     def ignored_meta_properties(self):
         perm_holder = (self.context['request'].auth if isinstance(self.context['request'].auth, (Device, TeamAPIToken))
                        else self.context['request'].user)
-        if perm_holder.has_organizer_permission(self.context['request'].organizer, 'can_change_organizer_settings', request=self.context['request']):
+        if perm_holder.has_organizer_permission(self.context['request'].organizer, 'organizer.settings.general:write', request=self.context['request']):
             return []
         return [k for k, p in self.meta_properties.items() if p.protected]
 
@@ -708,7 +707,10 @@ class TaxRuleSerializer(CountryFieldMixin, I18nAwareModelSerializer):
 
 
 class EventSettingsSerializer(SettingsSerializer):
+    default_write_permission = 'event.settings.general:write'
     default_fields = [
+        # These are readable for all users with access to the events, therefore secrets stored in the settings store
+        # should not be included!
         'imprint_url',
         'checkout_email_helptext',
         'presale_has_ended_text',
@@ -797,6 +799,7 @@ class EventSettingsSerializer(SettingsSerializer):
         'invoice_address_asked',
         'invoice_address_required',
         'invoice_address_vatid',
+        'invoice_address_vatid_required_countries',
         'invoice_address_company_required',
         'invoice_address_beneficiary',
         'invoice_address_custom_field',
@@ -807,6 +810,8 @@ class EventSettingsSerializer(SettingsSerializer):
         'invoice_reissue_after_modify',
         'invoice_include_free',
         'invoice_generate',
+        'invoice_generate_only_business',
+        'invoice_period',
         'invoice_numbers_consecutive',
         'invoice_numbers_prefix',
         'invoice_numbers_prefix_cancellations',
@@ -821,6 +826,7 @@ class EventSettingsSerializer(SettingsSerializer):
         'invoice_address_from',
         'invoice_address_from_zipcode',
         'invoice_address_from_city',
+        'invoice_address_from_state',
         'invoice_address_from_country',
         'invoice_address_from_tax_id',
         'invoice_address_from_vat_id',
@@ -830,6 +836,7 @@ class EventSettingsSerializer(SettingsSerializer):
         'invoice_eu_currencies',
         'invoice_logo_image',
         'invoice_renderer_highlight_order_code',
+        'tax_rounding',
         'cancel_allow_user',
         'cancel_allow_user_until',
         'cancel_allow_user_unpaid_keep',
@@ -942,6 +949,7 @@ class DeviceEventSettingsSerializer(EventSettingsSerializer):
         'invoice_address_asked',
         'invoice_address_required',
         'invoice_address_vatid',
+        'invoice_address_vatid_required_countries',
         'invoice_address_company_required',
         'invoice_address_beneficiary',
         'invoice_address_custom_field',
@@ -952,6 +960,7 @@ class DeviceEventSettingsSerializer(EventSettingsSerializer):
         'invoice_address_from',
         'invoice_address_from_zipcode',
         'invoice_address_from_city',
+        'invoice_address_from_state',
         'invoice_address_from_country',
         'invoice_address_from_tax_id',
         'invoice_address_from_vat_id',
@@ -1075,16 +1084,16 @@ class SeatSerializer(I18nAwareModelSerializer):
 
     def prefetch_expanded_data(self, items, request, expand_fields):
         if 'orderposition' in expand_fields:
-            if 'can_view_orders' not in request.eventpermset:
-                raise PermissionDenied('can_view_orders permission required for expand=orderposition')
+            if 'event.orders:read' not in request.eventpermset:
+                raise PermissionDenied('event.orders:read permission required for expand=orderposition')
             prefetch_by_id(items, OrderPosition.objects.prefetch_related('order'), 'orderposition_id', 'orderposition')
         if 'cartposition' in expand_fields:
-            if 'can_view_orders' not in request.eventpermset:
-                raise PermissionDenied('can_view_orders permission required for expand=cartposition')
+            if 'event.orders:read' not in request.eventpermset:
+                raise PermissionDenied('event.orders:read permission required for expand=cartposition')
             prefetch_by_id(items, CartPosition.objects, 'cartposition_id', 'cartposition')
         if 'voucher' in expand_fields:
-            if 'can_view_vouchers' not in request.eventpermset:
-                raise PermissionDenied('can_view_vouchers permission required for expand=voucher')
+            if 'event.vouchers:read' not in request.eventpermset:
+                raise PermissionDenied('event.vouchers:read permission required for expand=voucher')
             prefetch_by_id(items, Voucher.objects, 'voucher_id', 'voucher')
 
     def __init__(self, instance, *args, **kwargs):

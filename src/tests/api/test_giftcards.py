@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -168,6 +168,35 @@ def test_giftcard_detail_expand(token_client, organizer, event, giftcard):
         "valid_from": None,
         "valid_until": None,
         "blocked": None
+    }
+
+
+@pytest.mark.django_db
+def test_giftcard_detail_expand_without_permissions(team, token_client, organizer, event, giftcard):
+    with scopes_disabled():
+        o = Order.objects.create(
+            code='FOO', event=event, email='dummy@dummy.test',
+            status=Order.STATUS_PENDING, datetime=now(), expires=now() + timedelta(days=10),
+            sales_channel=event.organizer.sales_channels.get(identifier="web"),
+            total=14, locale='en'
+        )
+        ticket = event.items.create(name='Early-bird ticket', category=None, default_price=23, admission=True,
+                                    personalized=True)
+        op = o.positions.create(item=ticket, price=Decimal("14"))
+        giftcard.owner_ticket = op
+        giftcard.save()
+
+    team.all_event_permissions = False
+    team.save()
+
+    res = dict(TEST_GC_RES)
+    res["id"] = giftcard.pk
+    res["issuance"] = giftcard.issuance.isoformat().replace('+00:00', 'Z')
+    resp = token_client.get('/api/v1/organizers/{}/giftcards/{}/?expand=owner_ticket'.format(organizer.slug, giftcard.pk))
+    assert resp.status_code == 200
+
+    assert resp.data["owner_ticket"] == {
+        "id": op.pk,
     }
 
 

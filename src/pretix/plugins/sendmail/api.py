@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -113,7 +113,7 @@ class RuleViewSet(viewsets.ModelViewSet):
     filterset_class = RuleFilter
     ordering = ('id',)
     ordering_fields = ('id',)
-    permission = 'can_change_event_settings'
+    permission = 'event.settings.general:write'
 
     def get_queryset(self):
         return Rule.objects.filter(event=self.request.event)

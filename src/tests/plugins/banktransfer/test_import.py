@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -53,7 +53,7 @@ from pretix.plugins.banktransfer.tasks import process_banktransfers
 
 @pytest.fixture
 def env():
-    o = Organizer.objects.create(name='Dummy', slug='dummy')
+    o = Organizer.objects.create(name='Dummy', slug='dummy', plugins='pretix.plugins.banktransfer')
     event = Event.objects.create(
         organizer=o, name='Dummy', slug='dummy',
         date_from=now(), plugins='pretix.plugins.banktransfer,pretix.plugins.paypal'
@@ -61,7 +61,7 @@ def env():
     event.settings.invoice_numbers_prefix = 'INV-'
     event.settings.invoice_numbers_counter_length = 3
     user = User.objects.create_user('dummy@dummy.dummy', 'dummy')
-    t = Team.objects.create(organizer=event.organizer, can_view_orders=True, can_change_orders=True)
+    t = Team.objects.create(organizer=event.organizer, all_event_permissions=True)
     t.members.add(user)
     t.limit_events.add(event)
     o1 = Order.objects.create(
@@ -386,6 +386,20 @@ def test_mark_paid_organizer_dash_in_slug(env, orga_job):
 
 
 @pytest.mark.django_db
+def test_mark_paid_organizer_dash_in_slug_missing(env, orga_job):
+    env[0].slug = "foo-bar"
+    env[0].save()
+    process_banktransfers(orga_job, [{
+        'payer': 'Karla Kundin',
+        'reference': 'Bestellung FOOBAR1234S',
+        'date': '2016-01-26',
+        'amount': '23.00'
+    }])
+    env[2].refresh_from_db()
+    assert env[2].status == Order.STATUS_PAID
+
+
+@pytest.mark.django_db
 def test_mark_paid_organizer_varying_order_code_length(env, orga_job):
     env[2].code = "123412341234"
     env[2].save()
@@ -490,7 +504,7 @@ def test_valid_plus_invalid_match(env, orga_job):
         'payer': 'Karla Kundin',
         'reference': 'Bestellungen DUMMY-1Z3AS DUMMY-99999',
         'date': '2016-01-26',
-        'amount': '.00'
+        'amount': '2.00'
     }])
     with scopes_disabled():
         job = BankImportJob.objects.last()
@@ -820,3 +834,56 @@ def test_ambigious_date_with_region(env, job):
 
     with scopes_disabled():
         assert env[2].payments.last().info_data["date"] == "2016-05-03"
+
+
+@pytest.mark.django_db
+def test_event_name_prefix_contains_dash(env, orga_job):
+    event, user, o1, o2 = env
+    slugs = ['dummy-2', 'dummy2345']
+    for slug in slugs:
+        event = Event.objects.create(
+            organizer=event.organizer, name=slug.upper(), slug=slug,
+            date_from=now(), plugins='pretix.plugins.banktransfer,pretix.plugins.paypal'
+        )
+    with scopes_disabled():
+        o1.event = Event.objects.get(slug="dummy2345")
+        o1.save()
+    process_banktransfers(orga_job, [{
+        'payer': 'Karla Kundin',
+        'reference': f'DUMMY2345-{o1.code}',
+        'date': '2016-01-26',
+        'amount': '23.00'
+    }])
+    with scopes_disabled():
+        job = BankImportJob.objects.last()
+        t = job.transactions.last()
+        assert t.state == BankTransaction.STATE_VALID
+
+
+@pytest.mark.xfail
+@pytest.mark.django_db
+def test_event_name_prefix_multiple_dashes(env, orga_job):
+    # We decided to ignore the case of multiple events where the event slugs only differ in dashes
+    # for now. If we change that, switch this test case from xfail to regular test.
+
+    event, user, o1, o2 = env
+    slugs = ['dummy-2', 'dummy--2', 'dummy2345']
+    for slug in slugs:
+        event = Event.objects.create(
+            organizer=event.organizer, name=slug.upper(), slug=slug,
+            date_from=now(), plugins='pretix.plugins.banktransfer,pretix.plugins.paypal'
+        )
+
+    with scopes_disabled():
+        o1.event = Event.objects.get(slug="dummy-2")
+        o1.save()
+    process_banktransfers(orga_job, [{
+        'payer': 'Karla Kundin',
+        'reference': f'DUMMY2-{o1.code}',
+        'date': '2016-01-26',
+        'amount': '23.00'
+    }])
+    with scopes_disabled():
+        job = BankImportJob.objects.last()
+        t = job.transactions.last()
+        assert t.state == BankTransaction.STATE_VALID

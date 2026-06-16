@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -49,7 +49,7 @@ from django.utils.translation import (
     gettext as _, gettext_lazy, pgettext, pgettext_lazy,
 )
 from reportlab.lib.units import mm
-from reportlab.platypus import Flowable, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import Flowable, Spacer, Table, TableStyle
 
 from pretix.base.exporter import BaseExporter, ListExporter
 from pretix.base.models import (
@@ -64,6 +64,7 @@ from pretix.base.timeframes import (
 from pretix.control.forms.widgets import Select2
 from pretix.helpers.filenames import safe_for_filename
 from pretix.helpers.iter import chunked_iterable
+from pretix.helpers.reportlab import FontFallbackParagraph
 from pretix.helpers.templatetags.jsonfield import JSONExtract
 from pretix.plugins.reports.exporters import ReportlabExportMixin
 
@@ -81,7 +82,8 @@ class CheckInListMixin(BaseExporter):
                      widget=forms.RadioSelect(
                          attrs={'class': 'scrolling-choice'}
                      ),
-                     initial=self.event.checkin_lists.first()
+                     initial=self.event.checkin_lists.first(),
+                     required=True
                  )),
                 ('date_range',
                  DateFrameField(
@@ -142,7 +144,6 @@ class CheckInListMixin(BaseExporter):
         if not self.event.has_subevents:
             del d['date_range']
 
-        d['list'].queryset = self.event.checkin_lists.all()
         d['list'].widget = Select2(
             attrs={
                 'data-model-select2': 'generic',
@@ -154,7 +155,6 @@ class CheckInListMixin(BaseExporter):
             }
         )
         d['list'].widget.choices = d['list'].choices
-        d['list'].required = True
 
         return d
 
@@ -343,7 +343,7 @@ class PDFCheckinList(ReportlabExportMixin, CheckInListMixin, BaseExporter):
         ]
 
         story = [
-            Paragraph(
+            FontFallbackParagraph(
                 cl.name,
                 headlinestyle
             ),
@@ -351,7 +351,7 @@ class PDFCheckinList(ReportlabExportMixin, CheckInListMixin, BaseExporter):
         if cl.subevent:
             story += [
                 Spacer(1, 3 * mm),
-                Paragraph(
+                FontFallbackParagraph(
                     '{} ({} {})'.format(
                         cl.subevent.name,
                         cl.subevent.get_date_range_display(),
@@ -381,10 +381,10 @@ class PDFCheckinList(ReportlabExportMixin, CheckInListMixin, BaseExporter):
         headrowstyle.fontName = 'OpenSansBd'
         for q in questions:
             txt = str(q.question)
-            p = Paragraph(txt, headrowstyle)
+            p = FontFallbackParagraph(txt, headrowstyle)
             while p.wrap(colwidths[len(tdata[0])], 5000)[1] > 30 * mm:
                 txt = txt[:len(txt) - 50] + "..."
-                p = Paragraph(txt, headrowstyle)
+                p = FontFallbackParagraph(txt, headrowstyle)
             tdata[0].append(p)
 
         qs = self._get_queryset(cl, form_data)
@@ -431,8 +431,8 @@ class PDFCheckinList(ReportlabExportMixin, CheckInListMixin, BaseExporter):
                 CBFlowable(bool(op.last_checked_in)) if not op.blocked else '—',
                 '✘' if op.order.status != Order.STATUS_PAID else '✔',
                 op.order.code,
-                Paragraph(name, self.get_style()),
-                Paragraph(bleach.clean(str(item), tags={'br'}).strip().replace('<br>', '<br/>'), self.get_style()),
+                FontFallbackParagraph(name, self.get_style()),
+                FontFallbackParagraph(bleach.clean(str(item), tags={'br'}).strip().replace('<br>', '<br/>'), self.get_style()),
             ]
             acache = {}
             if op.addon_to:
@@ -443,10 +443,10 @@ class PDFCheckinList(ReportlabExportMixin, CheckInListMixin, BaseExporter):
             for q in questions:
                 txt = acache.get(q.pk, '')
                 txt = bleach.clean(txt, tags={'br'}).strip().replace('<br>', '<br/>')
-                p = Paragraph(txt, self.get_style())
+                p = FontFallbackParagraph(txt, self.get_style())
                 while p.wrap(colwidths[len(row)], 5000)[1] > 50 * mm:
                     txt = txt[:len(txt) - 50] + "..."
-                    p = Paragraph(txt, self.get_style())
+                    p = FontFallbackParagraph(txt, self.get_style())
                 row.append(p)
             if op.order.status != Order.STATUS_PAID:
                 tstyledata += [
@@ -475,6 +475,7 @@ class CSVCheckinList(CheckInListMixin, ListExporter):
     category = pgettext_lazy('export_category', 'Check-in')
     description = gettext_lazy("Download a spreadsheet with all attendees that are included in a check-in list.")
     featured = True
+    repeatable_read = False
 
     @property
     def additional_form_fields(self):
@@ -501,7 +502,7 @@ class CSVCheckinList(CheckInListMixin, ListExporter):
         if cl.include_pending:
             headers.append(_('Paid'))
 
-        if form_data['secrets']:
+        if form_data.get('secrets', False):
             headers.append(_('Secret'))
 
         headers.append(_('Email'))
@@ -601,7 +602,7 @@ class CSVCheckinList(CheckInListMixin, ListExporter):
                 ]
                 if cl.include_pending:
                     row.append(_('Yes') if op.order.status == Order.STATUS_PAID else _('No'))
-                if form_data['secrets']:
+                if form_data.get('secrets', False):
                     row.append(op.secret)
                 row.append(op.attendee_email or (op.addon_to.attendee_email if op.addon_to else '') or op.order.email or '')
                 row.append(str(op.order.phone) if op.order.phone else '')
@@ -672,6 +673,7 @@ class CSVCheckinCodeList(CheckInListMixin, ListExporter):
     category = pgettext_lazy('export_category', 'Check-in')
     description = gettext_lazy("Download a spreadsheet with all valid check-in barcodes e.g. for import into a "
                                "different system. Does not included blocked codes or personal data.")
+    repeatable_read = False
 
     @property
     def additional_form_fields(self):
@@ -742,6 +744,7 @@ class CheckinLogList(ListExporter):
     category = pgettext_lazy('export_category', 'Check-in')
     description = gettext_lazy("Download a spreadsheet with one line for every scan that happened at your check-in "
                                "stations.")
+    repeatable_read = False
 
     @property
     def additional_form_fields(self):

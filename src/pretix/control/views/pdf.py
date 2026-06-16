@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -44,7 +44,9 @@ from pypdf.errors import PdfReadError
 from reportlab.lib.units import mm
 
 from pretix.base.i18n import language
-from pretix.base.models import CachedFile, InvoiceAddress, OrderPosition
+from pretix.base.models import (
+    CachedFile, InvoiceAddress, ItemProgramTime, OrderPosition,
+)
 from pretix.base.pdf import get_images, get_variables
 from pretix.base.settings import PERSON_NAME_SCHEMES
 from pretix.control.permissions import EventPermissionRequiredMixin
@@ -56,7 +58,7 @@ logger = logging.getLogger(__name__)
 
 class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
     template_name = 'pretixcontrol/pdf/index.html'
-    permission = 'can_change_settings'
+    permission = 'event.settings.general:write'
     accepted_formats = (
         'application/pdf',
     )
@@ -94,6 +96,9 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
         item = self.request.event.items.create(name=_("Sample product"), default_price=Decimal('42.23'),
                                                description=_("Sample product description"))
         item2 = self.request.event.items.create(name=_("Sample workshop"), default_price=Decimal('23.40'))
+
+        ItemProgramTime.objects.create(start=now(), end=now(), item=item)
+        ItemProgramTime.objects.create(start=now(), end=now(), item=item2)
 
         from pretix.base.models import Order
         order = self.request.event.orders.create(status=Order.STATUS_PENDING, datetime=now(),
@@ -242,7 +247,7 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
         cf = None
         if request.POST.get("background", "").strip():
             try:
-                cf = CachedFile.objects.get(id=request.POST.get("background"))
+                cf = CachedFile.objects.get(id=request.POST.get("background"), web_download=True)
             except CachedFile.DoesNotExist:
                 pass
 
@@ -258,12 +263,7 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
 
             resp = HttpResponse(data, content_type=mimet)
             ftype = fname.split(".")[-1]
-            if settings.DEBUG:
-                # attachment is more secure as we're dealing with user-generated stuff here, but inline is much more convenient during debugging
-                resp['Content-Disposition'] = 'inline; filename="ticket-preview.{}"'.format(ftype)
-                resp._csp_ignore = True
-            else:
-                resp['Content-Disposition'] = 'attachment; filename="ticket-preview.{}"'.format(ftype)
+            resp['Content-Disposition'] = 'inline; filename="ticket-preview.{}"'.format(ftype)
             return resp
         elif "data" in request.POST:
             if cf:
@@ -287,6 +287,7 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
         ctx['layout'] = json.dumps(self.get_current_layout())
         ctx['title'] = self.title
         ctx['locales'] = [p for p in settings.LANGUAGES if p[0] in self.request.event.settings.locales]
+        ctx['maxfilesize'] = self.maxfilesize
         return ctx
 
 
@@ -303,6 +304,5 @@ class FontsCSSView(TemplateView):
 class PdfView(TemplateView):
     def get(self, request, *args, **kwargs):
         cf = get_object_or_404(CachedFile, id=kwargs.get("filename"), filename="background_preview.pdf")
-        resp = FileResponse(cf.file, content_type='application/pdf')
-        resp['Content-Disposition'] = 'attachment; filename="{}"'.format(cf.filename)
+        resp = FileResponse(cf.file, filename=cf.filename, content_type='application/pdf')
         return resp

@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -28,7 +28,7 @@ from django.forms import formset_factory
 from django.forms.utils import ErrorDict
 from django.urls import reverse
 from django.utils.functional import cached_property
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _, pgettext_lazy
 from i18nfield.forms import I18nInlineFormSet
 
 from pretix.base.forms import I18nModelForm
@@ -103,6 +103,16 @@ class SubEventBulkForm(SubEventForm):
         required=False,
         limit_choices=('date_from', 'date_to'),
     )
+    skip_if_overlap = forms.BooleanField(
+        label=pgettext_lazy('subevent', 'Skip dates that overlap with any existing date'),
+        help_text=pgettext_lazy(
+            'subevent',
+            'This can be useful if all your dates happen in the same location and no repeated dates should '
+            'be created in conflict with existing special events. This respects even inactive dates and works best if '
+            'all dates have both a start and end time.'
+        ),
+        required=False,
+    )
 
     def __init__(self, *args, **kwargs):
         self.event = kwargs['event']
@@ -134,16 +144,12 @@ class SubEventBulkEditForm(I18nModelForm):
             # i18n fields
             if k in self.mixed_values:
                 self.fields[k].widget.attrs['placeholder'] = '[{}]'.format(_('Selection contains various values'))
-            else:
-                self.fields[k].widget.attrs['placeholder'] = ''
             self.fields[k].one_required = False
 
         for k in ('geo_lat', 'geo_lon', 'comment'):
             # scalar fields
             if k in self.mixed_values:
                 self.fields[k].widget.attrs['placeholder'] = '[{}]'.format(_('Selection contains various values'))
-            else:
-                self.fields[k].widget.attrs['placeholder'] = ''
             self.fields[k].widget.is_required = False
             self.fields[k].required = False
 
@@ -396,7 +402,8 @@ class QuotaFormSet(I18nInlineFormSet):
             use_required_attribute=False,
             locales=self.locales,
             event=self.event,
-            items=self.items
+            items=self.items,
+            searchable_selection=self.searchable_selection,
         )
         self.add_fields(form, None)
         return form

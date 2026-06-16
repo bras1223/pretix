@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -22,7 +22,7 @@
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from reportlab.lib import pagesizes
-from reportlab.lib.units import mm
+from reportlab.lib.units import inch, mm
 
 
 def _simple_template(w, h):
@@ -260,5 +260,10 @@ TEMPLATES = {
         ),
         "pagesize": (88.9 * mm, 33.87 * mm),
         "layout": _simple_template(88.9 * mm, 33.87 * mm),
+    },
+    "4inx3in": {
+        "label": format_lazy(_("{width} x {height} inch label"), width=4, height=3),
+        "pagesize": (4 * inch, 3 * inch),
+        "layout": _simple_template(4 * inch, 3 * inch),
     },
 }

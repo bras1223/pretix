@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -43,7 +43,7 @@ from django.forms import formset_factory, inlineformset_factory
 from django.forms.utils import ErrorDict
 from django.urls import reverse
 from django.utils.crypto import get_random_string
-from django.utils.html import conditional_escape
+from django.utils.html import conditional_escape, format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _, pgettext_lazy
 from django_scopes.forms import SafeModelChoiceField
@@ -70,12 +70,15 @@ from pretix.base.forms.widgets import (
     SplitDateTimePickerWidget, format_placeholders_help_text,
 )
 from pretix.base.models import (
-    Customer, Device, EventMetaProperty, Gate, GiftCard, GiftCardAcceptance,
-    Membership, MembershipType, OrderPosition, Organizer, ReusableMedium,
-    SalesChannel, Team,
+    Customer, Device, Event, EventMetaProperty, Gate, GiftCard,
+    GiftCardAcceptance, Membership, MembershipType, OrderPosition, Organizer,
+    ReusableMedium, SalesChannel, Team,
 )
 from pretix.base.models.customers import CustomerSSOClient, CustomerSSOProvider
-from pretix.base.models.organizer import OrganizerFooterLink
+from pretix.base.models.organizer import OrganizerFooterLink, TeamQuerySet
+from pretix.base.permissions import (
+    get_all_event_permission_groups, get_all_organizer_permission_groups,
+)
 from pretix.base.settings import (
     PERSON_NAME_SCHEMES, PERSON_NAME_TITLE_GROUPS, validate_organizer_settings,
 )
@@ -297,7 +300,34 @@ class MembershipTypeForm(I18nModelForm):
         fields = ['name', 'transferable', 'allow_parallel_usage', 'max_usages']
 
 
+class PermissionMultipleChoiceField(forms.MultipleChoiceField):
+    def to_python(self, value):
+        return {
+            k: True for k in super().to_python(value) if k
+        }
+
+    def prepare_value(self, value):
+        if isinstance(value, dict):
+            return [k for k, v in value.items() if v is True]
+        return super().prepare_value(value)
+
+
 class TeamForm(forms.ModelForm):
+    def _make_label(self, p):
+        source = '{}'
+        params = [p.label]
+
+        if p.plugin_name:
+            source = '<span class="fa fa-puzzle-piece text-muted" data-toggle="tooltip" title="{}"></span> ' + source
+            params.insert(0, _("Provided by a plugin"))
+
+        if p.help_text:
+            source += ' <span class="fa fa-info-circle text-muted" data-toggle="tooltip" title="{}"></span>'
+            params.append(p.help_text)
+
+        source += ' (<code>{}</code>)'
+        params.append(p.name)
+        return format_html(source, *params)
 
     def __init__(self, *args, **kwargs):
         organizer = kwargs.pop('organizer')
@@ -305,16 +335,62 @@ class TeamForm(forms.ModelForm):
         self.fields['limit_events'].queryset = organizer.events.all().order_by(
             '-has_subevents', '-date_from'
         )
+        self.event_field_names = []
+        for pg in get_all_event_permission_groups().values():
+            initial = ",".join(sorted(
+                a for a in pg.actions if self.instance and self.instance.limit_event_permissions.get(f"{pg.name}:{a}")
+            )) or "EMPTY"
+            self.fields[f'event_{pg.name}'] = forms.ChoiceField(
+                choices=[
+                    (
+                        ",".join(sorted(opt.actions)) or "EMPTY",
+                        format_html(
+                            '{label} '
+                            '<span class="fa fa-question-circle fa-fw text-muted" data-toggle="tooltip"'
+                            ' data-placement="right" title="{help_text}"></span>',
+                            label=opt.label,
+                            help_text=opt.help_text,
+                        ) if opt.help_text else opt.label,
+                    )
+                    for opt in pg.options
+                ],
+                label=pg.label,
+                help_text=pg.help_text,
+                initial=initial,
+                widget=forms.RadioSelect,
+            )
+            self.event_field_names.append(f'event_{pg.name}')
+        self.organizer_field_names = []
+        for pg in get_all_organizer_permission_groups().values():
+            initial = ",".join(sorted(
+                a for a in pg.actions if self.instance and self.instance.limit_organizer_permissions.get(f"{pg.name}:{a}")
+            )) or "EMPTY"
+            self.fields[f'organizer_{pg.name}'] = forms.ChoiceField(
+                choices=[
+                    (
+                        ",".join(sorted(opt.actions)) or "EMPTY",
+                        format_html(
+                            '{label} '
+                            '<span class="fa fa-question-circle fa-fw text-muted" data-toggle="tooltip"'
+                            ' data-placement="right" title="{help_text}"></span>',
+                            label=opt.label,
+                            help_text=opt.help_text,
+                        ) if opt.help_text else opt.label,
+                    )
+                    for opt in pg.options
+                ],
+                label=pg.label,
+                help_text=pg.help_text,
+                initial=initial,
+                widget=forms.RadioSelect,
+            )
+            self.organizer_field_names.append(f'organizer_{pg.name}')
 
     class Meta:
         model = Team
-        fields = ['name', 'require_2fa', 'all_events', 'limit_events', 'can_create_events',
-                  'can_change_teams', 'can_change_organizer_settings',
-                  'can_manage_gift_cards', 'can_manage_customers',
-                  'can_manage_reusable_media',
-                  'can_change_event_settings', 'can_change_items',
-                  'can_view_orders', 'can_change_orders', 'can_checkin_orders',
-                  'can_view_vouchers', 'can_change_vouchers']
+        fields = ['name', 'require_2fa', 'all_events', 'limit_events',
+                  'all_event_permissions',
+                  'all_organizer_permissions',]
         widgets = {
             'limit_events': forms.CheckboxSelectMultiple(attrs={
                 'data-inverse-dependency': '#id_all_events',
@@ -327,14 +403,56 @@ class TeamForm(forms.ModelForm):
 
     def clean(self):
         data = super().clean()
-        if self.instance.pk and not data['can_change_teams']:
+
+        data['limit_event_permissions'] = {}
+        if not data['all_event_permissions']:
+            for pg in get_all_event_permission_groups().values():
+                selected = data.get(f'event_{pg.name}', 'EMPTY')
+                if selected == "EMPTY":
+                    selected_actions = []
+                else:
+                    selected_actions = selected.split(',')
+                for action in pg.actions:
+                    if action in selected_actions:
+                        data['limit_event_permissions'][f"{pg.name}:{action}"] = True
+        self.instance.limit_event_permissions = data['limit_event_permissions']
+
+        data['limit_organizer_permissions'] = {}
+        if not data['all_organizer_permissions']:
+            for pg in get_all_organizer_permission_groups().values():
+                selected = data.get(f'organizer_{pg.name}', 'EMPTY')
+                if selected == "EMPTY":
+                    selected_actions = []
+                else:
+                    selected_actions = selected.split(',')
+                for action in pg.actions:
+                    if action in selected_actions:
+                        data['limit_organizer_permissions'][f"{pg.name}:{action}"] = True
+        self.instance.limit_organizer_permissions = data['limit_organizer_permissions']
+
+        if self.instance.pk and not data['all_organizer_permissions'] and 'organizer.teams:write' not in data.get('limit_organizer_permissions', []):
             if not self.instance.organizer.teams.exclude(pk=self.instance.pk).filter(
-                    can_change_teams=True, members__isnull=False
+                TeamQuerySet.organizer_permission_q("organizer.teams:write"),
+                members__isnull=False
             ).exists():
                 raise ValidationError(_('The changes could not be saved because there would be no remaining team with '
                                         'the permission to change teams and permissions.'))
 
         return data
+
+    @property
+    def changed_data_for_log(self):
+        r = {}
+        for k in self.changed_data:
+            if k == "limit_events":
+                r[k] = [e.id for e in getattr(self.instance, k).all()]
+            elif k.startswith("event_"):
+                r["limit_event_permissions"] = self.instance.limit_event_permissions
+            elif k.startswith("organizer_"):
+                r["limit_organizer_permissions"] = self.instance.limit_organizer_permissions
+            else:
+                r[k] = getattr(self.instance, k)
+        return r
 
 
 class GateForm(forms.ModelForm):
@@ -474,6 +592,7 @@ class OrganizerSettingsForm(SettingsForm):
         'customer_accounts',
         'customer_accounts_native',
         'customer_accounts_link_by_email',
+        'customer_accounts_require_login_for_order_access',
         'invoice_regenerate_allowed',
         'contact_mail',
         'imprint_url',
@@ -581,7 +700,11 @@ class MailSettingsForm(SettingsForm):
 
     mail_bcc = forms.CharField(
         label=_("Bcc address"),
-        help_text=_("All emails will be sent to this address as a Bcc copy"),
+        help_text=''.join([
+            str(_("All emails will be sent to this address as a Bcc copy.")),
+            str(_("You can specify multiple recipients separated by commas.")),
+            str(_("Sensitive emails like password resets will not be sent in Bcc.")),
+        ]),
         validators=[multimail_validate],
         required=False,
         max_length=255
@@ -630,6 +753,16 @@ class MailSettingsForm(SettingsForm):
         required=False,
         widget=I18nMarkdownTextarea,
     )
+    mail_subject_customer_security_notice = I18nFormField(
+        label=_("Subject"),
+        required=False,
+        widget=I18nTextInput,
+    )
+    mail_text_customer_security_notice = I18nFormField(
+        label=_("Text"),
+        required=False,
+        widget=I18nMarkdownTextarea,
+    )
 
     base_context = {
         'mail_text_customer_registration': ['customer', 'url'],
@@ -638,6 +771,8 @@ class MailSettingsForm(SettingsForm):
         'mail_subject_customer_email_change': ['customer', 'url'],
         'mail_text_customer_reset': ['customer', 'url'],
         'mail_subject_customer_reset': ['customer', 'url'],
+        'mail_text_customer_security_notice': ['customer', 'url', 'message'],
+        'mail_subject_customer_security_notice': ['customer', 'url', 'message'],
     }
 
     def _get_sample_context(self, base_parameters):
@@ -650,6 +785,9 @@ class MailSettingsForm(SettingsForm):
                 self.organizer,
                 'presale:organizer.customer.activate'
             ) + '?token=' + get_random_string(30)
+
+        if 'message' in base_parameters:
+            placeholders['message'] = _('Your password has been changed.')
 
         if 'customer' in base_parameters:
             placeholders['name'] = pgettext_lazy('person_name_sample', 'John Doe')
@@ -692,7 +830,9 @@ class WebHookForm(forms.ModelForm):
         self.fields['events'].choices = [
             (
                 a.action_type,
-                mark_safe('{} – <code>{}</code>'.format(a.verbose_name, a.action_type))
+                format_html('{} – <code>{}</code><br><span class="text-muted">{}</span>', a.verbose_name, a.action_type, a.help_text)
+                if a.help_text else
+                format_html('{} – <code>{}</code>', a.verbose_name, a.action_type)
             ) for a in get_all_webhook_events().values()
         ]
         if self.instance and self.instance.pk:
@@ -726,6 +866,21 @@ class GiftCardCreateForm(forms.ModelForm):
         kwargs['initial'] = initial
         super().__init__(*args, **kwargs)
 
+        if self.organizer.settings.customer_accounts:
+            self.fields['customer'].queryset = self.organizer.customers.all()
+            self.fields['customer'].widget = Select2(
+                attrs={
+                    'data-model-select2': 'generic',
+                    'data-select2-url': reverse('control:organizer.customers.select2', kwargs={
+                        'organizer': self.organizer.slug,
+                    }),
+                }
+            )
+            self.fields['customer'].widget.choices = self.fields['customer'].choices
+            self.fields['customer'].required = False
+        else:
+            del self.fields['customer']
+
     def clean_secret(self):
         s = self.cleaned_data['secret']
         if GiftCard.objects.filter(
@@ -744,9 +899,10 @@ class GiftCardCreateForm(forms.ModelForm):
 
     class Meta:
         model = GiftCard
-        fields = ['secret', 'currency', 'testmode', 'expires', 'conditions']
+        fields = ['secret', 'currency', 'testmode', 'expires', 'conditions', 'customer']
         field_classes = {
-            'expires': SplitDateTimeField
+            'expires': SplitDateTimeField,
+            'customer': SafeModelChoiceField,
         }
         widgets = {
             'expires': SplitDateTimePickerWidget,
@@ -757,10 +913,11 @@ class GiftCardCreateForm(forms.ModelForm):
 class GiftCardUpdateForm(forms.ModelForm):
     class Meta:
         model = GiftCard
-        fields = ['expires', 'conditions', 'owner_ticket']
+        fields = ['expires', 'conditions', 'owner_ticket', 'customer']
         field_classes = {
             'expires': SplitDateTimeField,
             'owner_ticket': SafeOrderPositionChoiceField,
+            'customer': SafeModelChoiceField,
         }
         widgets = {
             'expires': SplitDateTimePickerWidget,
@@ -778,11 +935,25 @@ class GiftCardUpdateForm(forms.ModelForm):
                 'data-select2-url': reverse('control:organizer.ticket_select2', kwargs={
                     'organizer': organizer.slug,
                 }),
-                'data-placeholder': _('Ticket')
             }
         )
         self.fields['owner_ticket'].widget.choices = self.fields['owner_ticket'].choices
         self.fields['owner_ticket'].required = False
+
+        if organizer.settings.customer_accounts:
+            self.fields['customer'].queryset = organizer.customers.all()
+            self.fields['customer'].widget = Select2(
+                attrs={
+                    'data-model-select2': 'generic',
+                    'data-select2-url': reverse('control:organizer.customers.select2', kwargs={
+                        'organizer': organizer.slug,
+                    }),
+                }
+            )
+            self.fields['customer'].widget.choices = self.fields['customer'].choices
+            self.fields['customer'].required = False
+        else:
+            del self.fields['customer']
 
 
 class ReusableMediumUpdateForm(forms.ModelForm):
@@ -814,7 +985,6 @@ class ReusableMediumUpdateForm(forms.ModelForm):
                 'data-select2-url': reverse('control:organizer.ticket_select2', kwargs={
                     'organizer': organizer.slug,
                 }),
-                'data-placeholder': _('Ticket')
             }
         )
         self.fields['linked_orderposition'].widget.choices = self.fields['linked_orderposition'].choices
@@ -827,7 +997,6 @@ class ReusableMediumUpdateForm(forms.ModelForm):
                 'data-select2-url': reverse('control:organizer.giftcards.select2', kwargs={
                     'organizer': organizer.slug,
                 }),
-                'data-placeholder': _('Gift card')
             }
         )
         self.fields['linked_giftcard'].widget.choices = self.fields['linked_giftcard'].choices
@@ -841,7 +1010,6 @@ class ReusableMediumUpdateForm(forms.ModelForm):
                     'data-select2-url': reverse('control:organizer.customers.select2', kwargs={
                         'organizer': organizer.slug,
                     }),
-                    'data-placeholder': _('Customer')
                 }
             )
             self.fields['customer'].widget.choices = self.fields['customer'].choices
@@ -991,6 +1159,13 @@ class OrganizerFooterLinkForm(I18nModelForm):
     class Meta:
         model = OrganizerFooterLink
         fields = ('label', 'url')
+        widgets = {
+            "url": forms.URLInput(
+                attrs={
+                    "placeholder": "https://..."
+                }
+            )
+        }
 
 
 class BaseOrganizerFooterLinkFormSet(I18nFormSetMixin, forms.BaseInlineFormSet):
@@ -1205,3 +1380,19 @@ class SalesChannelForm(I18nModelForm):
                 )
 
         return d
+
+
+class OrganizerPluginEventsForm(forms.Form):
+    events = SafeEventMultipleChoiceField(
+        queryset=Event.objects.none(),
+        widget=forms.CheckboxSelectMultiple(attrs={
+            'class': 'scrolling-multiple-choice scrolling-multiple-choice-large',
+        }),
+        label=_("Events with active plugin"),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        events = kwargs.pop('events')
+        super().__init__(*args, **kwargs)
+        self.fields['events'].queryset = events

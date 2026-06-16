@@ -8,15 +8,16 @@ var async_task_is_long = false;
 var async_task_dont_redirect = false;
 
 var async_task_status_messages = {
-    long_task_started: gettext(
+    // These are functions in order to be lazily evaluated after the gettext file is loaded
+    long_task_started: () => gettext(
         'Your request is currently being processed. Depending on the size of your event, this might take up to ' +
         'a few minutes.'
     ),
-    long_task_pending: gettext(
+    long_task_pending: () => gettext(
         'Your request has been queued on the server and will soon be ' +
         'processed.'
     ),
-    short_task: gettext(
+    short_task: () => gettext(
         'Your request arrived on the server but we still wait for it to be ' +
         'processed. If this takes longer than two minutes, please contact us or go ' +
         'back in your browser and try again.'
@@ -47,8 +48,23 @@ function async_task_on_success(data) {
             history.replaceState({}, "pretix", async_task_old_url);
         }
     }
-    if (!async_task_dont_redirect)
-        location.href = data.redirect;
+    if (!async_task_dont_redirect) {
+        $(window).one("pageshow", function (e) {
+            // hide waitingDialog when using browser's history back
+            waitingDialog.hide();
+        });
+        if (async_task_is_download && window.self !== window.top) {
+            // if in an iframe, force to download an async_task_is_download
+            // e.g. pretix-reseller embeds order-page in iframe, which would cause ticket-PDFs to be displayed inline
+            var a = document.createElement("a");
+            a.href = data.redirect;
+            a.download = "";
+            a.target = "_blank";
+            a.click();
+        } else {
+            location.href = data.redirect;
+        }
+    }
     $(this).trigger('pretix:async-task-success', data);
 }
 
@@ -73,12 +89,12 @@ function async_task_check_callback(data, textStatus, jqXHR) {
 function async_task_update_status(data) {
     if (async_task_is_long) {
         if (data.started) {
-            waitingDialog.setStatus(async_task_status_messages.long_task_started);
+            waitingDialog.setStatus(async_task_status_messages.long_task_started());
         } else {
-            waitingDialog.setStatus(async_task_status_messages.long_task_pending);
+            waitingDialog.setStatus(async_task_status_messages.long_task_pending());
         }
     } else {
-        waitingDialog.setStatus(async_task_status_messages.short_task);
+        waitingDialog.setStatus(async_task_status_messages.short_task());
     }
 }
 
@@ -324,9 +340,11 @@ var ajaxErrDialog = {
         $("#ajaxerr .links").html("<a class='btn btn-default ajaxerr-close'>"
                                   + gettext("Close message") + "</a>");
         $("body").addClass("ajaxerr has-modal-dialog");
+        $("#ajaxerr").prop("hidden", false);
     },
     hide: function () {
         "use strict";
         $("body").removeClass("ajaxerr has-modal-dialog");
+        $("#ajaxerr").prop("hidden", true);
     },
 };

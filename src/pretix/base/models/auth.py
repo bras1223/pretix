@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -35,8 +35,10 @@
 import binascii
 import json
 import operator
+import secrets
 from datetime import timedelta
 from functools import reduce
+from typing import Protocol
 
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -44,14 +46,15 @@ from django.contrib.auth.models import (
 )
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import BadRequest, PermissionDenied
 from django.db import IntegrityError, models, transaction
 from django.db.models import Q
 from django.utils.crypto import get_random_string, salted_hmac
+from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_otp.models import Device
 from django_scopes import scopes_disabled
-from webauthn.helpers.structs import PublicKeyCredentialDescriptor
 
 from pretix.base.i18n import language
 from pretix.helpers.urls import build_absolute_uri
@@ -63,6 +66,14 @@ from .base import LoggingMixin
 
 class EmailAddressTakenError(IntegrityError):
     pass
+
+
+class PermissionHolder(Protocol):
+    def has_event_permission(self, organizer, event, perm_name=None, request=None, session_key=None) -> bool:
+        ...
+
+    def has_organizer_permission(self, organizer, perm_name=None, request=None):
+        ...
 
 
 class UserManager(BaseUserManager):
@@ -211,6 +222,28 @@ class SuperuserPermissionSet:
         return True
 
 
+class EventPermissionSet(set):
+    def __contains__(self, item):
+        from pretix.base.permissions import assert_valid_event_permission
+
+        if super().__contains__(item):
+            return True
+
+        assert_valid_event_permission(item, allow_tuple=False)
+        return False
+
+
+class OrganizerPermissionSet(set):
+    def __contains__(self, item):
+        from pretix.base.permissions import assert_valid_organizer_permission
+
+        if super().__contains__(item):
+            return True
+
+        assert_valid_organizer_permission(item, allow_tuple=False)
+        return False
+
+
 class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
     """
     This is the user model used by pretix for authentication.
@@ -239,9 +272,11 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
+    MAX_CONFIRMATION_CODE_ATTEMPTS = 10
 
     email = models.EmailField(unique=True, db_index=True, null=True, blank=True,
                               verbose_name=_('Email'), max_length=190)
+    is_verified = models.BooleanField(default=False, verbose_name=_('Verified email address'))
     fullname = models.CharField(max_length=255, blank=True, null=True,
                                 verbose_name=_('Full name'))
     is_active = models.BooleanField(default=True,
@@ -334,27 +369,97 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
             return self.email
 
     def send_security_notice(self, messages, email=None):
-        from pretix.base.services.mail import SendMailException, mail
+        from pretix.base.services.mail import mail
 
-        try:
-            with language(self.locale):
-                msg = '- ' + '\n- '.join(str(m) for m in messages)
+        with language(self.locale):
+            msg = '- ' + '\n- '.join(str(m) for m in messages)
 
-            mail(
-                email or self.email,
-                _('Account information changed'),
-                'pretixcontrol/email/security_notice.txt',
-                {
-                    'user': self,
-                    'messages': msg,
-                    'url': build_absolute_uri('control:user.settings')
-                },
-                event=None,
-                user=self,
-                locale=self.locale
-            )
-        except SendMailException:
-            pass  # Already logged
+        mail(
+            email or self.email,
+            _('Account information changed'),
+            'pretixcontrol/email/security_notice.txt',
+            {
+                'user': self,
+                'messages': msg,
+                'url': build_absolute_uri('control:user.settings'),
+                'instance': settings.PRETIX_INSTANCE_NAME,
+            },
+            event=None,
+            user=self,
+            locale=self.locale
+        )
+
+    def send_confirmation_code(self, session, reason, email=None, state=None):
+        """
+        Sends a confirmation code via email to the user. The code is only valid for the action specified by `reason`.
+        The email is either sent to the email address currently on file for the user, or to the one given in the optional `email` parameter.
+        A `state` value can be provided which is bound to this confirmation code, and returned on successfully checking the code.
+        :param session: the user's request session
+        :param reason: the action which should be confirmed using this confirmation code (currently, only `email_change` is allowed)
+        :param email: optional, the email address to send the confirmation code to
+        :param state: optional
+        """
+        from pretix.base.services.mail import mail
+
+        with language(self.locale):
+            if reason == 'email_change':
+                msg = str(_('to confirm changing your email address from {old_email}\nto {new_email}, use the following code:').format(
+                    old_email=self.email, new_email=email,
+                ))
+            elif reason == 'email_verify':
+                msg = str(_('to confirm that your email address {email} belongs to your pretix account, use the following code:').format(
+                    email=self.email,
+                ))
+            else:
+                raise Exception('Invalid confirmation code reason')
+
+        code = "%07d" % secrets.SystemRandom().randint(0, 9999999)
+        session['user_confirmation_code:' + reason] = {
+            'code': code,
+            'state': state,
+            'attempts': 0,
+        }
+        mail(
+            email or self.email,
+            _('pretix confirmation code'),
+            'pretixcontrol/email/confirmation_code.txt',
+            {
+                'user': self,
+                'reason': msg,
+                'code': code,
+                'instance': settings.PRETIX_INSTANCE_NAME,
+            },
+            event=None,
+            user=self,
+            locale=self.locale
+        )
+
+    def check_confirmation_code(self, session, reason, code):
+        """
+        Checks a confirmation code entered by the user against the valid code stored in the session.
+        If the code is correct, an optional state bound to the code is returned.
+        If the code is incorrect, PermissionDenied is raised. If the code could not be validated, either because no
+        code for the given reason is stored, or the number of input attempts is exceeded, BadRequest is raised.
+
+        :param session: the user's request session
+        :param reason: the action which should be confirmed using this confirmation code
+        :param code: the code entered by the user
+        :return: optional state bound to this code using the state parameter of send_confirmation_code, None otherwise
+        """
+        stored = session.get('user_confirmation_code:' + reason)
+        if not stored:
+            raise BadRequest
+
+        if stored['attempts'] > User.MAX_CONFIRMATION_CODE_ATTEMPTS:
+            raise BadRequest
+
+        if int(stored['code']) == int(code):
+            del session['user_confirmation_code:' + reason]
+            return stored['state']
+        else:
+            stored['attempts'] += 1
+            session['user_confirmation_code:' + reason] = stored
+            raise PermissionDenied
 
     def send_password_reset(self):
         from pretix.base.services.mail import mail
@@ -362,6 +467,7 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         mail(
             self.email, _('Password recovery'), 'pretixcontrol/email/forgot.txt',
             {
+                'instance': settings.PRETIX_INSTANCE_NAME,
                 'user': self,
                 'url': (build_absolute_uri('control:auth.forgot.recover')
                         + '?id=%d&token=%s' % (self.id, default_token_generator.make_token(self)))
@@ -401,7 +507,7 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         :return: set
         """
         teams = self._get_teams_for_event(organizer, event)
-        sets = [t.permission_set() for t in teams]
+        sets = [t.event_permission_set() for t in teams]
         if sets:
             return set.union(*sets)
         else:
@@ -415,7 +521,7 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         :return: set
         """
         teams = self._get_teams_for_organizer(organizer)
-        sets = [t.permission_set() for t in teams]
+        sets = [t.organizer_permission_set() for t in teams]
         if sets:
             return set.union(*sets)
         else:
@@ -430,7 +536,7 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
 
         :param organizer: The organizer of the event
         :param event: The event to check
-        :param perm_name: The permission, e.g. ``can_change_teams``
+        :param perm_name: The permission, e.g. ``event.orders:read``
         :param request: The current request (optional)
         :param session_key: The current session key (optional)
         :return: bool
@@ -442,8 +548,8 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         if teams:
             self._teamcache['e{}'.format(event.pk)] = teams
             if isinstance(perm_name, (tuple, list)):
-                return any([any(team.has_permission(p) for team in teams) for p in perm_name])
-            if not perm_name or any([team.has_permission(perm_name) for team in teams]):
+                return any([any(team.has_event_permission(p) for team in teams) for p in perm_name])
+            if not perm_name or any([team.has_event_permission(perm_name) for team in teams]):
                 return True
         return False
 
@@ -453,7 +559,7 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         to the organizer ``organizer``.
 
         :param organizer: The organizer to check
-        :param perm_name: The permission, e.g. ``can_change_teams``
+        :param perm_name: The permission, e.g. ``organizer.events:create``
         :param request: The current request (optional). Required to detect staff sessions properly.
         :return: bool
         """
@@ -462,8 +568,8 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         teams = self._get_teams_for_organizer(organizer)
         if teams:
             if isinstance(perm_name, (tuple, list)):
-                return any([any(team.has_permission(p) for team in teams) for p in perm_name])
-            if not perm_name or any([team.has_permission(perm_name) for team in teams]):
+                return any([any(team.has_organizer_permission(p) for team in teams) for p in perm_name])
+            if not perm_name or any([team.has_organizer_permission(perm_name) for team in teams]):
                 return True
         return False
 
@@ -494,14 +600,15 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         :return: Iterable of Events
         """
         from .event import Event
+        from .organizer import TeamQuerySet
 
         if request and self.has_active_staff_session(request.session.session_key):
             return Event.objects.all()
 
         if isinstance(permission, (tuple, list)):
-            q = reduce(operator.or_, [Q(**{p: True}) for p in permission])
+            q = reduce(operator.or_, [TeamQuerySet.event_permission_q(p) for p in permission])
         else:
-            q = Q(**{permission: True})
+            q = TeamQuerySet.event_permission_q(permission)
 
         return Event.objects.filter(
             Q(organizer_id__in=self.teams.filter(q, all_events=True).values_list('organizer', flat=True))
@@ -534,14 +641,13 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         :return: Iterable of Organizers
         """
         from .event import Organizer
+        from .organizer import TeamQuerySet
 
         if request and self.has_active_staff_session(request.session.session_key):
             return Organizer.objects.all()
 
-        kwargs = {permission: True}
-
         return Organizer.objects.filter(
-            id__in=self.teams.filter(**kwargs).values_list('organizer', flat=True)
+            id__in=self.teams.filter(TeamQuerySet.organizer_permission_q(permission)).values_list('organizer', flat=True)
         )
 
     def has_active_staff_session(self, session_key=None):
@@ -596,6 +702,23 @@ class User(AbstractBaseUser, PermissionsMixin, LoggingMixin):
         self.session_token = generate_session_token()
         self.save(update_fields=['session_token'])
 
+    @cached_property
+    @scopes_disabled()
+    def is_in_any_teams(self):
+        return self.teams.exists()
+
+
+class UserWithStaffSession:
+    # Wrapper around a User object with a staff session, implementing the PermissionHolder Protocol
+    def __init__(self, user):
+        self.user = user
+
+    def has_event_permission(self, organizer, event, perm_name=None, request=None, session_key=None) -> bool:
+        return True
+
+    def has_organizer_permission(self, organizer, perm_name=None, request=None):
+        return True
+
 
 class UserKnownLoginSource(models.Model):
     user = models.ForeignKey('User', on_delete=models.CASCADE, related_name="known_login_sources")
@@ -636,6 +759,8 @@ class U2FDevice(Device):
 
     @property
     def webauthndevice(self):
+        from webauthn.helpers.structs import PublicKeyCredentialDescriptor
+
         d = json.loads(self.json_data)
         return PublicKeyCredentialDescriptor(websafe_decode(d['keyHandle']))
 
@@ -665,6 +790,8 @@ class WebAuthnDevice(Device):
 
     @property
     def webauthndevice(self):
+        from webauthn.helpers.structs import PublicKeyCredentialDescriptor
+
         return PublicKeyCredentialDescriptor(websafe_decode(self.credential_id))
 
     @property

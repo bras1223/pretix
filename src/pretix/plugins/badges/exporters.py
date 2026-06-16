@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -57,7 +57,7 @@ from django.utils.translation import gettext as _, gettext_lazy, pgettext_lazy
 from pypdf import PageObject, PdfReader, PdfWriter, Transformation
 from pypdf.generic import RectangleObject
 from reportlab.lib import pagesizes
-from reportlab.lib.units import mm
+from reportlab.lib.units import inch, mm
 from reportlab.pdfgen import canvas
 
 from pretix.base.exporter import BaseExporter
@@ -133,6 +133,14 @@ OPTIONS = OrderedDict([
         'offsets': [66.1 * mm, 29.6 * mm],
         'pagesize': pagesizes.A4,
     }),
+    ('avery_4inx3in', {
+        'name': 'Avery 4" x 3" (74459)',
+        'cols': 2,
+        'rows': 3,
+        'margins': [1 * inch, .25 * inch, 1 * inch, .25 * inch],
+        'offsets': [4 * inch, 3 * inch],
+        'pagesize': pagesizes.LETTER,
+    }),
     ('avery_80x50', {
         'name': 'Avery Zweckform 80 x 50 mm (L4785)',
         'cols': 2,
@@ -170,7 +178,7 @@ OPTIONS = OrderedDict([
         'cols': 2,
         'rows': 6,
         'margins': [28.5 * mm, 30 * mm, 28.5 * mm, 30 * mm],
-        'offsets': [93 * mm, 60 * mm],
+        'offsets': [75 * mm, 40 * mm],
         'pagesize': pagesizes.A4,
     }),
     ('herma_50x80', {

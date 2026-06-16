@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -37,6 +37,7 @@ import uuid
 from collections import defaultdict
 from decimal import Decimal
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.core.cache import caches
@@ -69,6 +70,7 @@ from pretix.base.services.cart import (
 from pretix.base.services.cross_selling import CrossSellingService
 from pretix.base.services.memberships import validate_memberships_in_order
 from pretix.base.services.orders import perform_order
+from pretix.base.services.pricing import get_price
 from pretix.base.services.tasks import EventTask
 from pretix.base.settings import PERSON_NAME_SCHEMES
 from pretix.base.signals import validate_cart_addons
@@ -91,9 +93,7 @@ from pretix.presale.signals import (
     question_form_fields_overrides,
 )
 from pretix.presale.utils import customer_login
-from pretix.presale.views import (
-    CartMixin, get_cart, get_cart_is_free, get_cart_total,
-)
+from pretix.presale.views import CartMixin, get_cart, get_cart_is_free
 from pretix.presale.views.cart import (
     _items_from_post_data, cart_session, create_empty_cart_id,
     get_or_create_cart_id,
@@ -531,6 +531,48 @@ class AddOnsStep(CartMixin, AsyncAction, TemplateFlowStep):
         self._completed = True
         return True
 
+    def _get_initial_val_price(self, current_addon_products, cartpos, item, variation):
+        val = None
+        price = None
+
+        if self.request.POST:
+            if variation:
+                field = f'cp_{cartpos.pk}_variation_{item.pk}_{variation.pk}'
+            else:
+                field = f'cp_{cartpos.pk}_item_{item.pk}'
+
+            try:
+                val = int(self.request.POST.get(field) or '0')
+            except ValueError:
+                pass
+            if val and item.free_price:
+                custom_price = forms.DecimalField(localize=True).to_python(self.request.POST.get(f'{field}_price') or '0')
+                price = get_price(
+                    item, variation, voucher=cartpos.voucher, custom_price=custom_price, subevent=cartpos.subevent,
+                    custom_price_is_net=self.event.settings.display_net_prices,
+                    invoice_address=self.invoice_address,
+                )
+            else:
+                price = variation.suggested_price if variation else item.suggested_price
+
+        else:
+            current_products = current_addon_products[item.pk, variation.pk if variation else None]
+            val = len(current_products)
+            if current_products and item.free_price:
+                a = current_products[0]
+                price = TaxedPrice(
+                    net=a.price - a.tax_value,
+                    gross=a.price,
+                    tax=a.tax_value,
+                    name=a.item.tax_rule.name if a.item.tax_rule else "",
+                    rate=a.tax_rate,
+                    code=a.item.tax_rule.code if a.item.tax_rule else None,
+                )
+            else:
+                price = variation.suggested_price if variation else item.suggested_price
+
+        return val, price
+
     @cached_property
     def forms(self):
         """
@@ -589,34 +631,10 @@ class AddOnsStep(CartMixin, AsyncAction, TemplateFlowStep):
 
                     if i.has_variations:
                         for v in i.available_variations:
-                            v.initial = len(current_addon_products[i.pk, v.pk])
-                            if v.initial and i.free_price:
-                                a = current_addon_products[i.pk, v.pk][0]
-                                v.initial_price = TaxedPrice(
-                                    net=a.price - a.tax_value,
-                                    gross=a.price,
-                                    tax=a.tax_value,
-                                    name=a.item.tax_rule.name if a.item.tax_rule else "",
-                                    rate=a.tax_rate,
-                                    code=a.item.tax_rule.code if a.item.tax_rule else None,
-                                )
-                            else:
-                                v.initial_price = v.suggested_price
+                            v.initial, v.initial_price = self._get_initial_val_price(current_addon_products, cartpos, i, v)
                         i.expand = any(v.initial for v in i.available_variations)
                     else:
-                        i.initial = len(current_addon_products[i.pk, None])
-                        if i.initial and i.free_price:
-                            a = current_addon_products[i.pk, None][0]
-                            i.initial_price = TaxedPrice(
-                                net=a.price - a.tax_value,
-                                gross=a.price,
-                                tax=a.tax_value,
-                                name=a.item.tax_rule.name if a.item.tax_rule else "",
-                                rate=a.tax_rate,
-                                code=a.item.tax_rule.code if a.item.tax_rule else None,
-                            )
-                        else:
-                            i.initial_price = i.suggested_price
+                        i.initial, i.initial_price = self._get_initial_val_price(current_addon_products, cartpos, i, None)
 
                 if items:
                     formsetentry['categories'].append({
@@ -959,6 +977,10 @@ class QuestionsStep(QuestionsViewMixin, CartMixin, TemplateFlowStep):
             d['phone'] = str(d['phone'])
         self.cart_session['contact_form_data'] = d
         if self.address_asked or self.request.event.settings.invoice_name_required:
+            if not self.address_asked:
+                # Invoice address was there, but is no longer asked for, however, name is still required
+                self.invoice_form.instance.clear(except_name=True)
+
             addr = self.invoice_form.save()
 
             if self.cart_customer and self.invoice_form.cleaned_data.get('save'):
@@ -997,6 +1019,10 @@ class QuestionsStep(QuestionsViewMixin, CartMixin, TemplateFlowStep):
                                          'rate to your purchase and the price of the products in your cart has '
                                          'changed accordingly.'))
                 return redirect_to_url(self.get_next_url(request) + '?open_cart=true')
+        elif 'invoice_address' in self.cart_session:
+            # Invoice address was there, but is no longer asked for
+            self.invoice_address.delete()
+            del self.cart_session['invoice_address']
 
         try:
             validate_memberships_in_order(self.cart_customer, self.positions, self.request.event, lock=False,
@@ -1122,7 +1148,7 @@ class QuestionsStep(QuestionsViewMixin, CartMixin, TemplateFlowStep):
             'invoice' in self.request.GET or
             # Checking for self.invoice_address.pk is not enough as when an invoice_address has been added and later edited to be empty, it’s not None.
             # So check initial values as invoice_form can receive pre-filled values from invoice_address, widget-data or overwrites from plug-ins.
-            is_form_filled(self.invoice_form, ignore_keys=('is_business', 'country'))
+            is_form_filled(self.invoice_form, ignore_keys=('is_business', 'country', 'transmission_type'))
         )
 
         if self.cart_customer:
@@ -1136,6 +1162,7 @@ class QuestionsStep(QuestionsViewMixin, CartMixin, TemplateFlowStep):
                         "_state_for_address": a.state_for_address,
                         "_name": a.name,
                         "is_business": "business" if a.is_business else "individual",
+                        **(a.transmission_info or {}),
                     }
                     if a.name_parts:
                         name_parts = a.name_parts
@@ -1157,7 +1184,8 @@ class QuestionsStep(QuestionsViewMixin, CartMixin, TemplateFlowStep):
 
                     for k in (
                         "company", "street", "zipcode", "city", "country", "state",
-                        "state_for_address", "vat_id", "custom_field", "internal_reference", "beneficiary"
+                        "state_for_address", "vat_id", "custom_field", "internal_reference", "beneficiary",
+                        "transmission_type",
                     ):
                         v = getattr(a, k) or ""
                         # always add all values of an address even when empty,
@@ -1252,18 +1280,16 @@ class PaymentStep(CartMixin, TemplateFlowStep):
     @cached_property
     def _total_order_value(self):
         cart = get_cart(self.request)
-        total = get_cart_total(self.request)
         try:
-            total += sum([
-                f.value for f in get_fees(
-                    self.request.event, self.request, total, self.invoice_address,
-                    [p for p in self.cart_session.get('payments', []) if p.get('multi_use_supported')],
-                    cart,
-                )
-            ])
+            fees = get_fees(
+                event=self.request.event, request=self.request, invoice_address=self.invoice_address,
+                payments=[p for p in self.cart_session.get('payments', []) if p.get('multi_use_supported')],
+                positions=cart,
+            )
         except TaxRule.SaleNotAllowed:
             # ignore for now, will fail on order creation
-            pass
+            fees = []
+        total = sum([c.price for c in cart]) + sum([f.value for f in fees])
         return Decimal(total)
 
     @cached_property
@@ -1389,7 +1415,13 @@ class PaymentStep(CartMixin, TemplateFlowStep):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['current_payments'] = [p for p in self.current_selected_payments(self._total_order_value) if p.get('multi_use_supported')]
+        ctx['cart'] = self.get_cart()
+        ctx['current_payments'] = [
+            p for p in self.current_selected_payments(
+                ctx['cart']['raw'], ctx['cart']['fees'], ctx['cart']['invoice_address'],
+            )
+            if p.get('multi_use_supported')
+        ]
         ctx['remaining'] = self._total_order_value - sum(p['payment_amount'] for p in ctx['current_payments']) + sum(p['fee'] for p in ctx['current_payments'])
         ctx['providers'] = self.provider_forms
         ctx['show_fees'] = any(p['fee'] for p in self.provider_forms)
@@ -1402,7 +1434,6 @@ class PaymentStep(CartMixin, TemplateFlowStep):
             ctx['selected'] = self.single_use_payment['provider']
         else:
             ctx['selected'] = ''
-        ctx['cart'] = self.get_cart()
         return ctx
 
     def _is_allowed(self, prov, request):
@@ -1415,14 +1446,20 @@ class PaymentStep(CartMixin, TemplateFlowStep):
             return False
 
         cart = get_cart(self.request)
-        total = get_cart_total(self.request)
         try:
-            total += sum([f.value for f in get_fees(self.request.event, self.request, total, self.invoice_address,
-                                                    self.cart_session.get('payments', []), cart)])
+            fees = get_fees(
+                event=self.request.event,
+                request=self.request,
+                invoice_address=self.invoice_address,
+                payments=self.cart_session.get('payments', []),
+                positions=cart
+            )
         except TaxRule.SaleNotAllowed:
             # ignore for now, will fail on order creation
-            pass
-        selected = self.current_selected_payments(total, warn=warn, total_includes_payment_fees=True)
+            fees = []
+        total = sum([c.price for c in cart]) + sum([f.value for f in fees])
+
+        selected = self.current_selected_payments(cart, fees, self.invoice_address, warn=warn)
         if sum(p['payment_amount'] for p in selected) != total:
             if warn:
                 messages.error(request, _('Please select a payment method to proceed.'))
@@ -1506,7 +1543,11 @@ class ConfirmStep(CartMixin, AsyncAction, TemplateFlowStep):
         ctx = super().get_context_data(**kwargs)
         ctx['cart'] = self.get_cart(answers=True)
 
-        selected_payments = self.current_selected_payments(ctx['cart']['total'], total_includes_payment_fees=True)
+        selected_payments = self.current_selected_payments(
+            ctx['cart']['raw'],
+            ctx['cart']['fees'],
+            ctx['cart']['invoice_address'],
+        )
         ctx['payments'] = []
         for p in selected_payments:
             if p['provider'] == 'free':
@@ -1632,11 +1673,6 @@ class ConfirmStep(CartMixin, AsyncAction, TemplateFlowStep):
             value = value['order_id']
         order = Order.objects.get(id=value)
         return self.get_order_url(order)
-
-    def get_error_message(self, exception):
-        if exception.__class__.__name__ == 'SendMailException':
-            return _('There was an error sending the confirmation mail. Please try again later.')
-        return super().get_error_message(exception)
 
     def get_error_url(self):
         return self.get_step_url(self.request)

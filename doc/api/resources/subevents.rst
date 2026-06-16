@@ -155,8 +155,6 @@ Endpoints
 
    Creates a new subevent.
 
-   Permission required: "Can create events"
-
    **Example request**:
 
    .. sourcecode:: http
@@ -301,8 +299,6 @@ Endpoints
    provide all fields of the resource, other fields will be reset to default. With ``PATCH``, you only need to provide
    the fields that you want to change.
 
-   Permission required: "Can change event settings"
-
    **Example request**:
 
    .. sourcecode:: http
@@ -373,8 +369,6 @@ Endpoints
 .. http:delete:: /api/v1/organizers/(organizer)/events/(event)/subevents/(id)/
 
    Delete a sub-event. Note that events with orders cannot be deleted to ensure data integrity.
-
-   Permission required: "Can change event settings"
 
    **Example request**:
 

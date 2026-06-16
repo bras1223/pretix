@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -102,7 +102,7 @@ def _default_context(request):
                     complain_testmode_orders = request.event.orders.filter(testmode=True).exists()
                     request.event.cache.set('complain_testmode_orders', complain_testmode_orders, 30)
             ctx['complain_testmode_orders'] = complain_testmode_orders and request.user.has_event_permission(
-                request.organizer, request.event, 'can_view_orders', request=request
+                request.organizer, request.event, 'event.orders:read', request=request
             )
         else:
             ctx['complain_testmode_orders'] = False

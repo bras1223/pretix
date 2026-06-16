@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -28,8 +28,7 @@ class TimemachineTestMixin:
     @scopes_disabled()
     def _login_with_permission(self, orga):
         self.user = User.objects.create_user('dummy@dummy.dummy', 'dummy')
-        self.team1 = Team.objects.create(organizer=orga, can_create_events=True, can_change_event_settings=True,
-                                         can_change_items=True, all_events=True)
+        self.team1 = Team.objects.create(organizer=orga, all_event_permissions=True, all_events=True)
         self.team1.members.add(self.user)
         self.client.login(email='dummy@dummy.dummy', password='dummy')
 

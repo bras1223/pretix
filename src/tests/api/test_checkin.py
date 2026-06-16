@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -236,18 +236,20 @@ TEST_LIST_RES = {
     "rules": {}
 }
 
-
-@pytest.fixture
-def clist(event, item):
-    c = event.checkin_lists.create(name="Default", all_products=False)
-    c.limit_products.add(item)
-    return c
-
-
-@pytest.fixture
-def clist_all(event, item):
-    c = event.checkin_lists.create(name="Default", all_products=True)
-    return c
+TEST_HISTORY_RES = {
+    "successful": True,
+    "error_reason": None,
+    "error_explanation": None,
+    "position": 1234,
+    "datetime": "2017-12-25T12:45:23Z",
+    "created": "2017-12-25T12:45:23Z",
+    "list": 2,
+    "auto_checked_in": False,
+    "gate": None,
+    "device": None,
+    "device_id": None,
+    "type": "entry",
+}
 
 
 @pytest.mark.django_db
@@ -1163,6 +1165,30 @@ def test_store_failed(token_client, organizer, clist, event, order):
 
 
 @pytest.mark.django_db
+def test_store_failed_after_success(token_client, organizer, clist, event, order):
+    with scopes_disabled():
+        p = order.positions.first()
+        p.all_checkins.create(
+            type=Checkin.TYPE_ENTRY,
+            nonce='foobar',
+            successful=True,
+            list=clist,
+            raw_barcode=p.secret
+        )
+    resp = token_client.post('/api/v1/organizers/{}/events/{}/checkinlists/{}/failed_checkins/'.format(
+        organizer.slug, event.slug, clist.pk,
+    ), {
+        'raw_barcode': p.secret,
+        'nonce': 'foobar',
+        'position': p.pk,
+        'error_reason': 'unpaid'
+    }, format='json')
+    assert resp.status_code == 201
+    with scopes_disabled():
+        assert Checkin.all.filter(position=p).count() == 2
+
+
+@pytest.mark.django_db
 def test_redeem_unknown(token_client, organizer, clist, event, order):
     resp = _redeem(token_client, organizer, clist, 'unknown_secret', {'force': True})
     assert resp.status_code == 404
@@ -1343,9 +1369,8 @@ def test_checkin_pdf_data_requires_permission(token_client, event, team, organiz
     ))
     assert resp.data['results'][0].get('pdf_data')
     with scopes_disabled():
-        team.can_view_orders = False
-        team.can_change_orders = False
-        team.can_checkin_orders = True
+        team.limit_event_permissions = {"event.orders:checkin": True}
+        team.all_event_permissions = False
         team.save()
     resp = token_client.get('/api/v1/organizers/{}/events/{}/checkinlists/{}/positions/?search=z3fsn8jyu&pdf_data=true'.format(
         organizer.slug, event.slug, clist_all.pk
@@ -1366,3 +1391,57 @@ def test_expand(token_client, organizer, event, clist, clist_all, item, other_it
     ))
     assert resp.status_code == 200
     assert 'value' in resp.data['results'][0]['variation']
+
+
+@pytest.mark.django_db
+def test_history(token_client, organizer, event, clist, order):
+    with scopes_disabled():
+        ci = order.positions.first().checkins.create(list=clist, type=Checkin.TYPE_ENTRY, datetime=now())
+    res = dict(TEST_HISTORY_RES)
+    res["id"] = ci.pk
+    res["datetime"] = ci.datetime.isoformat().replace('+00:00', 'Z')
+    res["created"] = ci.created.isoformat().replace('+00:00', 'Z')
+    res["list"] = clist.pk
+    res["position"] = ci.position_id
+
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/'.format(
+        organizer.slug, event.slug,
+    ))
+    assert resp.status_code == 200
+    assert res == resp.data['results'][0]
+
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/?auto_checked_in=false'.format(
+        organizer.slug, event.slug,
+    ))
+    assert len(resp.data['results']) == 1
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/?auto_checked_in=true'.format(
+        organizer.slug, event.slug,
+    ))
+    assert len(resp.data['results']) == 0
+
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/?successful=true'.format(
+        organizer.slug, event.slug,
+    ))
+    assert len(resp.data['results']) == 1
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/?successful=false'.format(
+        organizer.slug, event.slug,
+    ))
+    assert len(resp.data['results']) == 0
+
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/?type=entry'.format(
+        organizer.slug, event.slug,
+    ))
+    assert len(resp.data['results']) == 1
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/?type=exit'.format(
+        organizer.slug, event.slug,
+    ))
+    assert len(resp.data['results']) == 0
+
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/?created_before=2099-01-01T00:00:00Z'.format(
+        organizer.slug, event.slug,
+    ))
+    assert len(resp.data['results']) == 1
+    resp = token_client.get('/api/v1/organizers/{}/events/{}/checkins/?created_before=2017-01-01T00:00:00Z'.format(
+        organizer.slug, event.slug,
+    ))
+    assert len(resp.data['results']) == 0

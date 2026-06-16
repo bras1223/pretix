@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -49,7 +49,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.formats import get_format
 from django.utils.functional import cached_property
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, now
 from django.utils.translation import gettext_lazy as _, pgettext_lazy
 from django.views import View
 from django.views.generic import CreateView, FormView, ListView, UpdateView
@@ -117,7 +117,7 @@ class SubEventList(EventPermissionRequiredMixin, PaginationMixin, SubEventQueryM
     model = SubEvent
     context_object_name = 'subevents'
     template_name = 'pretixcontrol/subevents/index.html'
-    permission = 'can_change_settings'
+    permission = None
 
     def get_queryset(self):
         return super().get_queryset(True).prefetch_related(
@@ -156,7 +156,7 @@ class SubEventList(EventPermissionRequiredMixin, PaginationMixin, SubEventQueryM
 class SubEventDelete(EventPermissionRequiredMixin, CompatDeleteView):
     model = SubEvent
     template_name = 'pretixcontrol/subevents/delete.html'
-    permission = 'can_change_settings'
+    permission = 'event.subevents:write'
     context_object_name = 'subevents'
 
     def get_object(self, queryset=None) -> SubEvent:
@@ -174,21 +174,38 @@ class SubEventDelete(EventPermissionRequiredMixin, CompatDeleteView):
             return HttpResponseRedirect(self.get_success_url())
         return super().get(request, *args, **kwargs)
 
-    @transaction.atomic
     def delete(self, request, *args, **kwargs):
         self.object = self.get_object()
         success_url = self.get_success_url()
 
-        if not self.object.allow_delete():
-            messages.error(request, pgettext_lazy('subevent', 'A date can not be deleted if orders already have been '
-                                                              'placed.'))
-            return HttpResponseRedirect(self.get_success_url())
+        try:
+            with transaction.atomic():
+                if not self.object.allow_delete():
+                    messages.error(request, pgettext_lazy('subevent', 'A date can not be deleted if orders already have been '
+                                                                      'placed.'))
+                    return HttpResponseRedirect(success_url)
+                self.object.log_action('pretix.subevent.deleted', user=self.request.user)
+                CartPosition.objects.filter(addon_to__subevent=self.object).delete()
+                self.object.cartposition_set.all().delete()
+                self.object.delete()
+        except ProtectedError:
+            if self.object.active:
+                with transaction.atomic():
+                    self.object.log_action(
+                        'pretix.subevent.changed', user=self.request.user, data={
+                            'active': False
+                        },
+                    )
+                self.object.active = False
+                self.object.save(update_fields=['active'])
+            messages.error(self.request, pgettext_lazy(
+                'subevent',
+                'The date could not be deleted as some constraints (e.g. data created by plug-ins) did not allow '
+                'it. The date was disabled instead.'
+            ))
         else:
-            self.object.log_action('pretix.subevent.deleted', user=self.request.user)
-            CartPosition.objects.filter(addon_to__subevent=self.object).delete()
-            self.object.cartposition_set.all().delete()
-            self.object.delete()
             messages.success(request, pgettext_lazy('subevent', 'The selected date has been deleted.'))
+
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self) -> str:
@@ -224,7 +241,7 @@ class SubEventEditorMixin(MetaDataEditorMixin):
             property=p,
             disabled=(
                 p.protected and
-                not self.request.user.has_organizer_permission(self.request.organizer, 'can_change_organizer_settings', request=self.request)
+                not self.request.user.has_organizer_permission(self.request.organizer, 'organizer.settings.general:write', request=self.request)
             ),
             default=self._default_meta.get(p.name, ''),
             instance=val_instances.get(p.pk, self.meta_model(property=p, subevent=self.object)),
@@ -491,7 +508,7 @@ class SubEventEditorMixin(MetaDataEditorMixin):
 class SubEventUpdate(EventPermissionRequiredMixin, SubEventEditorMixin, UpdateView):
     model = SubEvent
     template_name = 'pretixcontrol/subevents/detail.html'
-    permission = 'can_change_settings'
+    permission = 'event.subevents:write'
     context_object_name = 'subevent'
     form_class = SubEventForm
 
@@ -514,6 +531,7 @@ class SubEventUpdate(EventPermissionRequiredMixin, SubEventEditorMixin, UpdateVi
 
     @transaction.atomic
     def form_valid(self, form):
+        self.object = form.save()
         self.save_formset(self.object)
         self.save_cl_formset(self.object)
         self.save_meta()
@@ -523,25 +541,36 @@ class SubEventUpdate(EventPermissionRequiredMixin, SubEventEditorMixin, UpdateVi
             # TODO: LogEntry?
 
         messages.success(self.request, _('Your changes have been saved.'))
-        if form.has_changed() or any(f.has_changed() for f in self.plugin_forms):
-            data = {
-                k: form.cleaned_data.get(k) for k in form.changed_data
-            }
-            for f in self.plugin_forms:
-                data.update({
-                    k: (f.cleaned_data.get(k).name
-                        if isinstance(f.cleaned_data.get(k), File)
-                        else f.cleaned_data.get(k))
-                    for k in f.changed_data
-                })
+
+        change_data = {
+            k: (form.cleaned_data.get(k).name
+                if isinstance(form.cleaned_data.get(k), File)
+                else form.cleaned_data.get(k))
+            for k in form.changed_data
+        }
+        meta_changed = {}
+        for f in self.meta_forms:
+            if f.has_changed():
+                meta_changed[f.property.name] = f.cleaned_data["value"]
+        if meta_changed:
+            change_data['meta_data'] = meta_changed
+        for f in self.plugin_forms:
+            change_data.update({
+                k: (f.cleaned_data.get(k).name
+                    if isinstance(f.cleaned_data.get(k), File)
+                    else f.cleaned_data.get(k))
+                for k in f.changed_data
+            })
+        if change_data:
             self.object.log_action(
-                'pretix.subevent.changed', user=self.request.user, data=data
+                'pretix.subevent.changed', user=self.request.user, data=change_data
             )
+
         for f in self.plugin_forms:
             f.subevent = self.object
             f.save()
         tickets.invalidate_cache.apply_async(kwargs={'event': self.request.event.pk})
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self) -> str:
         return reverse('control:event.subevents', kwargs={
@@ -558,7 +587,7 @@ class SubEventUpdate(EventPermissionRequiredMixin, SubEventEditorMixin, UpdateVi
 class SubEventCreate(SubEventEditorMixin, EventPermissionRequiredMixin, CreateView):
     model = SubEvent
     template_name = 'pretixcontrol/subevents/detail.html'
-    permission = 'can_change_settings'
+    permission = 'event.subevents:write'
     context_object_name = 'subevent'
     form_class = SubEventForm
 
@@ -611,6 +640,14 @@ class SubEventCreate(SubEventEditorMixin, EventPermissionRequiredMixin, CreateVi
                     else f.cleaned_data.get(k))
                 for k in f.cleaned_data
             })
+
+        meta_changed = {}
+        for f in self.meta_forms:
+            if f.has_changed():
+                meta_changed[f.property.name] = f.cleaned_data["value"]
+        if meta_changed:
+            data['meta_data'] = meta_changed
+
         form.instance.log_action('pretix.subevent.added', data=dict(data), user=self.request.user)
 
         self.save_formset(form.instance)
@@ -652,7 +689,7 @@ class SubEventCreate(SubEventEditorMixin, EventPermissionRequiredMixin, CreateVi
 
 
 class SubEventBulkAction(SubEventQueryMixin, EventPermissionRequiredMixin, View):
-    permission = 'can_change_settings'
+    permission = 'event.subevents:write'
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -723,7 +760,7 @@ class SubEventBulkAction(SubEventQueryMixin, EventPermissionRequiredMixin, View)
 class SubEventBulkCreate(SubEventEditorMixin, EventPermissionRequiredMixin, AsyncFormView):
     model = SubEvent
     template_name = 'pretixcontrol/subevents/bulk.html'
-    permission = 'can_change_settings'
+    permission = 'event.subevents:write'
     context_object_name = 'subevent'
     form_class = SubEventBulkForm
     itemformclass = BulkSubEventItemForm
@@ -768,8 +805,15 @@ class SubEventBulkCreate(SubEventEditorMixin, EventPermissionRequiredMixin, Asyn
         ctx['time_formset'] = self.time_formset
 
         tf = get_format('TIME_INPUT_FORMATS')[0]
+        ctx['time_admission_sample'] = time(8, 30, 0).strftime(tf)
         ctx['time_begin_sample'] = time(9, 0, 0).strftime(tf)
         ctx['time_end_sample'] = time(18, 0, 0).strftime(tf)
+
+        df = get_format('DATETIME_INPUT_FORMATS')[0]
+        ctx['datetime_sample'] = now().replace(
+            year=2000, month=12, day=31, hour=18, minute=0, second=0, microsecond=0
+        ).strftime(df)
+
         return ctx
 
     @cached_property
@@ -892,6 +936,35 @@ class SubEventBulkCreate(SubEventEditorMixin, EventPermissionRequiredMixin, Asyn
 
             if len(subevents) > 100_000:
                 raise ValidationError(_('Please do not create more than 100.000 dates at once.'))
+
+        if form.cleaned_data.get("skip_if_overlap") and subevents:
+            def overlaps(a_from, a_to, b_from, b_to):
+                if a_from == b_from:
+                    return True
+                if a_from > b_from:
+                    # a starts after b
+                    # check if it starts before b ends
+                    return b_to and a_from < b_to
+                # a starts before b
+                # check if it ends before b starts
+                return a_to and a_to > b_from
+
+            date_min = min(se.date_from for se in subevents)
+            date_max = max(se.date_to or se.date_from for se in subevents)
+            dates_existing = list(self.request.event.subevents.annotate(
+                date_fromto=Coalesce('date_to', 'date_from'),
+            ).filter(
+                date_from__lte=date_max,
+                date_fromto__gte=date_min,
+            ).values('date_from', 'date_to'))
+            subevents = [
+                se for se in subevents if not any(
+                    overlaps(se.date_from, se.date_to, other['date_from'], other['date_to'])
+                    for other in dates_existing
+                )
+            ]
+            if not subevents:
+                raise ValidationError(_('All dates would be skipped because they conflict with existing dates.'))
 
         for i, se in enumerate(subevents):
             se.save(clear_cache=False)
@@ -1041,7 +1114,7 @@ class SubEventBulkCreate(SubEventEditorMixin, EventPermissionRequiredMixin, Asyn
 
 
 class SubEventBulkEdit(SubEventQueryMixin, EventPermissionRequiredMixin, FormView):
-    permission = 'can_change_settings'
+    permission = 'event.subevents:write'
     form_class = SubEventBulkEditForm
     template_name = 'pretixcontrol/subevents/bulk_edit.html'
     context_object_name = 'subevent'
@@ -1146,7 +1219,10 @@ class SubEventBulkEdit(SubEventQueryMixin, EventPermissionRequiredMixin, FormVie
         kwargs = {}
 
         if self.sampled_quotas is not None:
-            kwargs['instance'] = self.get_queryset()[0]
+            try:
+                kwargs['instance'] = self.get_queryset()[0]
+            except IndexError:
+                raise Http404("No matching dates")
 
         formsetclass = inlineformset_factory(
             SubEvent, Quota,

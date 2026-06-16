@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -243,8 +243,16 @@ class EventMixin:
     def waiting_list_active(self):
         if not self.settings.waiting_list_enabled:
             return False
+
         if self.settings.waiting_list_auto_disable:
-            return self.settings.waiting_list_auto_disable.datetime(self) > time_machine_now()
+            if self.settings.waiting_list_auto_disable.datetime(self) <= time_machine_now():
+                return False
+
+        if hasattr(self, 'active_quotas'):
+            # Only run when called with computed quotas, i.e. event calendar
+            if not self.best_availability[3]:
+                return False
+
         return True
 
     @property
@@ -322,9 +330,7 @@ class EventMixin:
         sq_active_item = Item.objects.using(settings.DATABASE_REPLICA).filter_available(channel=channel, voucher=voucher).filter(
             Q(variations__isnull=True)
             & Q(quotas__pk=OuterRef('pk'))
-        ).order_by().values_list('quotas__pk').annotate(
-            items=GroupConcat('pk', delimiter=',')
-        ).values('items')
+        )
 
         q_variation = (
             Q(active=True)
@@ -357,9 +363,7 @@ class EventMixin:
             q_variation &= Q(hide_without_voucher=False)
             q_variation &= Q(item__hide_without_voucher=False)
 
-        sq_active_variation = ItemVariation.objects.filter(q_variation).order_by().values_list('quotas__pk').annotate(
-            items=GroupConcat('pk', delimiter=',')
-        ).values('items')
+        sq_active_variation = ItemVariation.objects.filter(q_variation)
         quota_base_qs = Quota.objects.using(settings.DATABASE_REPLICA).filter(
             ignore_for_event_availability=False
         )
@@ -376,8 +380,23 @@ class EventMixin:
                 'quotas',
                 to_attr='active_quotas',
                 queryset=quota_base_qs.annotate(
-                    active_items=Subquery(sq_active_item, output_field=models.TextField()),
-                    active_variations=Subquery(sq_active_variation, output_field=models.TextField()),
+                    active_items=Subquery(
+                        sq_active_item.order_by().values_list('quotas__pk').annotate(
+                            items=GroupConcat('pk', delimiter=',')
+                        ).values('items'),
+                        output_field=models.TextField()
+                    ),
+                    active_variations=Subquery(
+                        sq_active_variation.order_by().values_list('quotas__pk').annotate(
+                            items=GroupConcat('pk', delimiter=',')
+                        ).values('items'),
+                        output_field=models.TextField()),
+                    has_active_items_with_waitinglist=Exists(
+                        sq_active_item.filter(allow_waitinglist=True),
+                    ),
+                    has_active_variations_with_waitinglist=Exists(
+                        sq_active_variation.filter(item__allow_waitinglist=True),
+                    ),
                 ).exclude(
                     Q(active_items="") & Q(active_variations="")
                 ).select_related('event', 'subevent')
@@ -406,11 +425,12 @@ class EventMixin:
     @cached_property
     def best_availability(self):
         """
-        Returns a 3-tuple of
+        Returns a 4-tuple of
 
         - The availability state of this event (one of the ``Quota.AVAILABILITY_*`` constants)
         - The number of tickets currently available (or ``None``)
         - The number of tickets "originally" available (or ``None``)
+        - Whether a sold out product has the waiting list enabled
 
         This can only be called on objects obtained through a queryset that has been passed through ``.annotated()``.
         """
@@ -433,6 +453,7 @@ class EventMixin:
         r = getattr(self, '_quota_cache', {})
         quotas_for_item = defaultdict(list)
         quotas_for_variation = defaultdict(list)
+        waiting_list_found = False
         for q in self.active_quotas:
             if q not in r:
                 r[q] = q.availability(allow_cache=True)
@@ -441,6 +462,8 @@ class EventMixin:
                 for item_id in q.active_items.split(","):
                     if item_id not in items_disabled:
                         quotas_for_item[item_id].append(q)
+            if q.has_active_items_with_waitinglist or q.has_active_variations_with_waitinglist:
+                waiting_list_found = True
             if q.active_variations:
                 for var_id in q.active_variations.split(","):
                     if var_id not in vars_disabled:
@@ -448,7 +471,7 @@ class EventMixin:
 
         if not self.active_quotas or (not quotas_for_item and not quotas_for_variation):
             # No item is enabled for this event, treat the event as "unknown"
-            return None, None, None
+            return None, None, None, waiting_list_found
 
         # We iterate over all items and variations and keep track of
         # - `best_state_found` - the best availability state we have seen so far. If one item is available, the event is available!
@@ -467,7 +490,7 @@ class EventMixin:
             quotas_that_are_not_unlimited = [q for q in quota_list if q.size is not None]
             if not quotas_that_are_not_unlimited:
                 # We found an unlimited ticket, no more need to do anything else
-                return Quota.AVAILABILITY_OK, None, None
+                return Quota.AVAILABILITY_OK, None, None, waiting_list_found
 
             if worst_state_for_ticket == Quota.AVAILABILITY_OK:
                 availability_of_this = min(max(0, r[q][1] - quota_used_for_found_tickets[q]) for q in quotas_that_are_not_unlimited)
@@ -481,7 +504,8 @@ class EventMixin:
                 quota_used_for_possible_tickets[q] += possible_of_this
 
             best_state_found = max(best_state_found, worst_state_for_ticket)
-        return best_state_found, num_tickets_found, num_tickets_possible
+
+        return best_state_found, num_tickets_found, num_tickets_possible, waiting_list_found
 
     def free_seats(self, ignore_voucher=None, sales_channel='web', include_blocked=False):
         assert isinstance(sales_channel, str) or sales_channel is None
@@ -551,8 +575,7 @@ class Event(EventMixin, LoggedModel):
     :type presale_end: datetime
     :param location: venue
     :type location: str
-    :param plugins: A comma-separated list of plugin names that are active for this
-                    event.
+    :param plugins: A comma-separated list of plugin names that are active for this event.
     :type plugins: str
     :param has_subevents: Enable event series functionality
     :type has_subevents: bool
@@ -698,6 +721,12 @@ class Event(EventMixin, LoggedModel):
         self.settings.name_scheme = 'given_family'
         self.settings.payment_banktransfer_invoice_immediately = True
         self.settings.low_availability_percentage = 10
+        self.settings.mail_send_order_free_attendee = True
+        self.settings.mail_send_order_placed_attendee = True
+        self.settings.mail_send_order_paid_attendee = True
+        self.settings.mail_send_order_approved_attendee = True
+        self.settings.mail_send_order_approved_free_attendee = True
+        self.settings.mail_text_download_reminder_attendee = True
 
     @property
     def social_image(self):
@@ -826,11 +855,38 @@ class Event(EventMixin, LoggedModel):
             time(hour=23, minute=59, second=59)
         ), tz)
 
+    def allow_copy_data(self, new_organizer, auth) -> bool:
+        """
+        Returns whether it is allowed to copy the event to the target organizer. Auth can be TeamAPIToken or User.
+        """
+        from ..permissions import get_all_event_permissions
+        from .auth import User
+
+        if self.organizer == new_organizer:
+            # Copying in the same organizer is always okay with any read access, we just need to ensure it does not
+            # grant more permissions than I had before, but that is handled by the view logic
+            return auth.has_event_permission(self.organizer, self, None)
+
+        if isinstance(auth, User):
+            # Cross-organizer copying requires almost full permission of source to prevent settings extraction
+            required_permissions = get_all_event_permissions() - {
+                # We do not require these, as this data is not copied
+                "event.orders:read", "event.orders:write", "event.vouchers:read", "event.vouchers:write",
+                "event.subevents:write",
+            }
+            given_permission = auth.get_event_permission_set(self.organizer, self)
+            return all(p in given_permission for p in required_permissions if ":" in p)
+
+        else:
+            # Tokens or devices can never copy between organizers, as they are organizer-bound. Kept for future
+            # compatibility and easier calling
+            return False
+
     def copy_data_from(self, other, skip_meta_data=False):
         from ..signals import event_copy_data
         from . import (
             Discount, Item, ItemAddOn, ItemBundle, ItemCategory, ItemMetaValue,
-            ItemVariationMetaValue, Question, Quota,
+            ItemProgramTime, ItemVariationMetaValue, Question, Quota,
         )
 
         #  Note: avoid self.set_active_plugins(), it causes trouble e.g. for the badges plugin.
@@ -973,6 +1029,12 @@ class Event(EventMixin, LoggedModel):
                 ia.bundled_variation = variation_map[ia.bundled_variation.pk]
             ia.save(force_insert=True)
 
+        if not self.has_subevents and not other.has_subevents:
+            for ipt in ItemProgramTime.objects.filter(item__event=other).prefetch_related('item'):
+                ipt.pk = None
+                ipt.item = item_map[ipt.item.pk]
+                ipt.save(force_insert=True)
+
         quota_map = {}
         for q in Quota.objects.filter(event=other, subevent__isnull=True).prefetch_related('items', 'variations'):
             quota_map[q.pk] = q
@@ -1091,7 +1153,7 @@ class Event(EventMixin, LoggedModel):
             s.save(force_insert=True)
 
         valid_sales_channel_identifers = set(self.organizer.sales_channels.values_list("identifier", flat=True))
-        skip_settings = (
+        skip_settings = {
             'ticket_secrets_pretix_sig1_pubkey',
             'ticket_secrets_pretix_sig1_privkey',
             # no longer used, but we still don't need to copy them
@@ -1099,7 +1161,10 @@ class Event(EventMixin, LoggedModel):
             'presale_css_checksum',
             'presale_widget_css_file',
             'presale_widget_css_checksum',
-        )
+        } | {
+            # Some settings might already exist due to e.g. the timezone being special in the API
+            s.key for s in self.settings._objects.all()
+        }
         settings_to_save = []
         for s in other.settings._objects.all():
             if s.key in skip_settings:
@@ -1360,14 +1425,13 @@ class Event(EventMixin, LoggedModel):
         from .auth import User
 
         if permission:
-            kwargs = {permission: True}
+            qs = Team.objects.with_event_permission(permission)
         else:
-            kwargs = {}
+            qs = Team.objects.all()
 
-        team_with_perm = Team.objects.filter(
+        team_with_perm = qs.filter(
             members__pk=OuterRef('pk'),
             organizer=self.organizer,
-            **kwargs
         ).filter(
             Q(all_events=True) | Q(limit_events__pk=self.pk)
         )
@@ -1396,7 +1460,7 @@ class Event(EventMixin, LoggedModel):
         from pretix.base.plugins import get_all_plugins
 
         return {
-            p.module: p for p in get_all_plugins(self)
+            p.module: p for p in get_all_plugins(event=self)
             if not p.name.startswith('.') and getattr(p, 'visible', True)
         }
 
@@ -1415,12 +1479,20 @@ class Event(EventMixin, LoggedModel):
         self.plugins = ",".join(modules)
 
     def enable_plugin(self, module, allow_restricted=frozenset()):
+        """
+        Adds a plugin to the list of plugins, calling its ``installed`` hook (if available).
+        It is the caller's responsibility to save the event object.
+        """
         plugins_active = self.get_plugins()
         if module not in plugins_active:
             plugins_active.append(module)
             self.set_active_plugins(plugins_active, allow_restricted=allow_restricted)
 
     def disable_plugin(self, module):
+        """
+        Adds a plugin to the list of plugins, calling its ``uninstalled`` hook (if available).
+        It is the caller's responsibility to save the event object.
+        """
         plugins_active = self.get_plugins()
         if module in plugins_active:
             plugins_active.remove(module)
@@ -1618,20 +1690,16 @@ class SubEvent(EventMixin, LoggedModel):
 
     @cached_property
     def item_overrides(self):
-        from .items import SubEventItem
-
         return {
             si.item_id: si
-            for si in SubEventItem.objects.filter(subevent=self)
+            for si in self.subeventitem_set.all()
         }
 
     @cached_property
     def var_overrides(self):
-        from .items import SubEventItemVariation
-
         return {
             si.variation_id: si
-            for si in SubEventItemVariation.objects.filter(subevent=self)
+            for si in self.subeventitemvariation_set.all()
         }
 
     @property

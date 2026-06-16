@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -39,8 +39,8 @@ from zoneinfo import ZoneInfo
 from django import forms
 from django.conf import settings
 from django.db.models import (
-    Case, CharField, Count, DateTimeField, F, IntegerField, Max, Min, OuterRef,
-    Q, Subquery, Sum, When,
+    Case, CharField, Count, DateTimeField, Exists, F, IntegerField, Max, Min,
+    OuterRef, Q, Subquery, Sum, When,
 )
 from django.db.models.functions import Coalesce
 from django.dispatch import receiver
@@ -68,6 +68,7 @@ from ...control.forms.filter import get_all_payment_providers
 from ...helpers import GroupConcat
 from ...helpers.iter import chunked_iterable
 from ...helpers.safe_openpyxl import remove_invalid_excel_chars
+from ...multidomain.urlreverse import build_absolute_uri
 from ..exporter import (
     ListExporter, MultiSheetListExporter, OrganizerLevelExportMixin,
 )
@@ -89,6 +90,7 @@ class OrderListExporter(MultiSheetListExporter):
                                'with a line for every order, one with a line for every order position, and one with '
                                'a line for every additional fee charged in an order.')
     featured = True
+    repeatable_read = False
 
     @cached_property
     def providers(self):
@@ -142,11 +144,23 @@ class OrderListExporter(MultiSheetListExporter):
         d = OrderedDict(d)
         if not self.is_multievent and not self.event.has_subevents:
             del d['event_date_range']
+        if not self.is_multievent:
+            d["items"] = forms.ModelMultipleChoiceField(
+                label=_("Products"),
+                queryset=self.event.items.all(),
+                widget=forms.CheckboxSelectMultiple(
+                    attrs={"class": "scrolling-multiple-choice"}
+                ),
+                help_text=_("If none are selected, all products are included. Orders are included if they contain "
+                            "at least one position of this product. The order totals etc. still include all products "
+                            "contained in the order."),
+                required=False,
+            )
         return d
 
     def _get_all_payment_methods(self, qs):
         pps = dict(get_all_payment_providers())
-        return sorted([(pp, pps[pp]) for pp in set(
+        return sorted([(pp, pps.get(pp, pp)) for pp in set(
             OrderPayment.objects.exclude(provider='free').filter(order__event__in=self.events).values_list(
                 'provider', flat=True
             ).distinct()
@@ -247,9 +261,17 @@ class OrderListExporter(MultiSheetListExporter):
             pcnt=Subquery(s, output_field=IntegerField())
         ).select_related('invoice_address', 'customer')
 
+        if form_data.get('items'):
+            qs = qs.filter(
+                Exists(OrderPosition.all.filter(
+                    order=OuterRef('pk'),
+                    item__in=form_data["items"]
+                ))
+            )
+
         qs = self._date_filter(qs, form_data, rel='')
 
-        if form_data['paid_only']:
+        if form_data.get('paid_only'):
             qs = qs.filter(status=Order.STATUS_PAID)
         return qs
 
@@ -287,13 +309,15 @@ class OrderListExporter(MultiSheetListExporter):
         headers.append(_('Email address verified'))
         headers.append(_('External customer ID'))
         headers.append(_('Payment providers'))
+        headers.append(_('Order link'))
         if form_data.get('include_payment_amounts'):
             payment_methods = self._get_all_payment_methods(qs)
             for id, vn in payment_methods:
                 headers.append(_('Paid by {method}').format(method=vn))
 
-        # get meta_data labels from first cached event
-        headers += next(iter(self.event_object_cache.values())).meta_data.keys()
+        if self.event_object_cache:
+            # get meta_data labels from first cached event if any
+            headers += next(iter(self.event_object_cache.values())).meta_data.keys()
         yield headers
 
         full_fee_sum_cache = {
@@ -306,6 +330,7 @@ class OrderListExporter(MultiSheetListExporter):
                 taxsum=Sum('tax_value'), grosssum=Sum('value')
             )
         }
+        payment_methods = None
         if form_data.get('include_payment_amounts'):
             payment_sum_cache = {
                 (o['order__id'], o['provider']): o['grosssum'] for o in
@@ -323,6 +348,7 @@ class OrderListExporter(MultiSheetListExporter):
                     grosssum=Sum('amount')
                 )
             }
+            payment_methods = self._get_all_payment_methods(qs)
         sum_cache = {
             (o['order__id'], o['tax_rate']): o for o in
             OrderPosition.objects.values('tax_rate', 'order__id').order_by().annotate(
@@ -361,7 +387,7 @@ class OrderListExporter(MultiSheetListExporter):
                     order.invoice_address.city,
                     order.invoice_address.country if order.invoice_address.country else
                     order.invoice_address.country_old,
-                    order.invoice_address.state,
+                    order.invoice_address.state_for_address,
                     order.invoice_address.custom_field,
                     order.invoice_address.vat_id,
                 ]
@@ -402,8 +428,14 @@ class OrderListExporter(MultiSheetListExporter):
                 if p and p != 'free'
             ]))
 
+            row.append(
+                build_absolute_uri(order.event, 'presale:event.order', kwargs={
+                    'order': order.code,
+                    'secret': order.secret,
+                })
+            )
+
             if form_data.get('include_payment_amounts'):
-                payment_methods = self._get_all_payment_methods(qs)
                 for id, vn in payment_methods:
                     row.append(
                         payment_sum_cache.get((order.id, id), Decimal('0.00')) -
@@ -427,8 +459,16 @@ class OrderListExporter(MultiSheetListExporter):
         ).annotate(
             payment_providers=Subquery(p_providers, output_field=CharField()),
         ).select_related('order', 'order__invoice_address', 'order__customer', 'tax_rule')
-        if form_data['paid_only']:
+        if form_data.get('paid_only'):
             qs = qs.filter(order__status=Order.STATUS_PAID, canceled=False)
+
+        if form_data.get('items'):
+            qs = qs.filter(
+                Exists(OrderPosition.all.filter(
+                    order=OuterRef('order'),
+                    item__in=form_data["items"]
+                ))
+            )
 
         qs = self._date_filter(qs, form_data, rel='order__')
         return qs
@@ -465,8 +505,9 @@ class OrderListExporter(MultiSheetListExporter):
         headers.append(_('External customer ID'))
         headers.append(_('Payment providers'))
 
-        # get meta_data labels from first cached event
-        headers += next(iter(self.event_object_cache.values())).meta_data.keys()
+        if self.event_object_cache:
+            # get meta_data labels from first cached event if any
+            headers += next(iter(self.event_object_cache.values())).meta_data.keys()
         yield headers
 
         yield self.ProgressSetTotal(total=qs.count())
@@ -505,7 +546,7 @@ class OrderListExporter(MultiSheetListExporter):
                     order.invoice_address.city,
                     order.invoice_address.country if order.invoice_address.country else
                     order.invoice_address.country_old,
-                    order.invoice_address.state,
+                    order.invoice_address.state_for_address,
                     order.invoice_address.vat_id,
                 ]
             except InvoiceAddress.DoesNotExist:
@@ -522,8 +563,13 @@ class OrderListExporter(MultiSheetListExporter):
         qs = OrderPosition.all.filter(
             order__event__in=self.events,
         )
-        if form_data['paid_only']:
+        if form_data.get('paid_only'):
             qs = qs.filter(order__status=Order.STATUS_PAID, canceled=False)
+
+        if form_data.get('items'):
+            qs = qs.filter(
+                item__in=form_data["items"]
+            )
 
         qs = self._date_filter(qs, form_data, rel='order__')
         return qs
@@ -600,13 +646,15 @@ class OrderListExporter(MultiSheetListExporter):
                 headers.append(_('Attendee name') + ': ' + str(label))
         headers += [
             _('Attendee email'),
-            _('Company'),
+            _('Attendee company'),
             _('Address'),
             _('ZIP code'),
             _('City'),
             _('Country'),
             pgettext('address', 'State'),
             _('Voucher'),
+            _('Voucher budget usage'),
+            _('Voucher tag'),
             _('Pseudonymization ID'),
             _('Ticket secret'),
             _('Seat ID'),
@@ -640,7 +688,7 @@ class OrderListExporter(MultiSheetListExporter):
                         options[q.pk].append(o)
                 headers.append(str(q.question))
         headers += [
-            _('Company'),
+            _('Invoice address company'),
             _('Invoice address name'),
         ]
         if name_scheme and len(name_scheme['fields']) > 1:
@@ -659,11 +707,12 @@ class OrderListExporter(MultiSheetListExporter):
             _('External customer ID'),
             _('Check-in lists'),
             _('Payment providers'),
+            _('Position order link')
         ]
 
-        # get meta_data labels from first cached event
-        meta_data_labels = next(iter(self.event_object_cache.values())).meta_data.keys()
         if has_subevents:
+            # get meta_data labels from first cached event
+            meta_data_labels = next(iter(self.event_object_cache.values())).meta_data.keys()
             headers += meta_data_labels
         yield headers
 
@@ -721,8 +770,10 @@ class OrderListExporter(MultiSheetListExporter):
                     op.zipcode or '',
                     op.city or '',
                     op.country if op.country else '',
-                    op.state or '',
+                    op.state_for_address or '',
                     op.voucher.code if op.voucher else '',
+                    op.voucher_budget_use if op.voucher_budget_use else '',
+                    op.voucher.tag if op.voucher else '',
                     op.pseudonymization_id,
                     op.secret,
                 ]
@@ -786,7 +837,7 @@ class OrderListExporter(MultiSheetListExporter):
                         order.invoice_address.city,
                         order.invoice_address.country if order.invoice_address.country else
                         order.invoice_address.country_old,
-                        order.invoice_address.state,
+                        order.invoice_address.state_for_address,
                         order.invoice_address.vat_id,
                     ]
                 except InvoiceAddress.DoesNotExist:
@@ -802,6 +853,14 @@ class OrderListExporter(MultiSheetListExporter):
                     str(self.providers.get(p, p)) for p in sorted(set((op.payment_providers or '').split(',')))
                     if p and p != 'free'
                 ]))
+
+                row.append(
+                    build_absolute_uri(order.event, 'presale:event.order.position', kwargs={
+                        'order': order.code,
+                        'secret': op.web_secret,
+                        'position': op.positionid
+                    })
+                )
 
                 if has_subevents:
                     if op.subevent:
@@ -824,6 +883,7 @@ class TransactionListExporter(ListExporter):
     description = gettext_lazy('Download a spreadsheet of all substantial changes to orders, i.e. all changes to '
                                'products, prices or tax rates. The information is only accurate for changes made with '
                                'pretix versions released after October 2021.')
+    repeatable_read = False
 
     @cached_property
     def providers(self):
@@ -1002,6 +1062,7 @@ class PaymentListExporter(ListExporter):
     category = pgettext_lazy('export_category', 'Order data')
     description = gettext_lazy('Download a spreadsheet of all payments or refunds of every order.')
     featured = True
+    repeatable_read = False
 
     @property
     def additional_form_fields(self):
@@ -1043,13 +1104,25 @@ class PaymentListExporter(ListExporter):
     def iterate_list(self, form_data):
         provider_names = dict(get_all_payment_providers())
 
+        i_numbers = Invoice.objects.filter(
+            order=OuterRef('order_id'),
+        ).values('order').annotate(
+            m=GroupConcat('full_invoice_no', delimiter=', ')
+        ).values(
+            'm'
+        ).order_by()
+
         payments = OrderPayment.objects.filter(
             order__event__in=self.events,
             state__in=form_data.get('payment_states', [])
+        ).annotate(
+            order_invoice_numbers=Subquery(i_numbers, output_field=CharField()),
         ).select_related('order').prefetch_related('order__event').order_by('created')
         refunds = OrderRefund.objects.filter(
             order__event__in=self.events,
             state__in=form_data.get('refund_states', [])
+        ).annotate(
+            order_invoice_numbers=Subquery(i_numbers, output_field=CharField()),
         ).select_related('order').prefetch_related('order__event').order_by('created')
 
         if form_data.get('end_date_range'):
@@ -1075,6 +1148,7 @@ class PaymentListExporter(ListExporter):
         headers = [
             _('Event slug'), _('Order'), _('Payment ID'), _('Creation date'), _('Completion date'), _('Status'),
             _('Status code'), _('Amount'), _('Payment method'), _('Comment'), _('Matching ID'), _('Payment details'),
+            _('Invoice numbers'),
         ]
         yield headers
 
@@ -1112,6 +1186,7 @@ class PaymentListExporter(ListExporter):
                 obj.comment if isinstance(obj, OrderRefund) else "",
                 matching_id,
                 payment_details,
+                obj.order_invoice_numbers,
             ]
             yield row
 
@@ -1141,7 +1216,7 @@ class QuotaListExporter(ListExporter):
         yield headers
 
         quotas = list(self.event.quotas.select_related('subevent'))
-        qa = QuotaAvailability(full_results=True)
+        qa = QuotaAvailability(full_results=True, allow_repeatable_read=True)
         qa.queue(*quotas)
         qa.compute()
 
@@ -1179,9 +1254,13 @@ class QuotaListExporter(ListExporter):
 class GiftcardTransactionListExporter(OrganizerLevelExportMixin, ListExporter):
     identifier = 'giftcardtransactionlist'
     verbose_name = gettext_lazy('Gift card transactions')
-    organizer_required_permission = 'can_manage_gift_cards'
     category = pgettext_lazy('export_category', 'Gift cards')
     description = gettext_lazy('Download a spreadsheet of all gift card transactions.')
+    repeatable_read = False
+
+    @classmethod
+    def get_required_organizer_permission(cls) -> str:
+        return 'organizer.giftcards:read'
 
     @property
     def additional_form_fields(self):
@@ -1240,6 +1319,7 @@ class GiftcardRedemptionListExporter(ListExporter):
     verbose_name = gettext_lazy('Gift card redemptions')
     category = pgettext_lazy('export_category', 'Order data')
     description = gettext_lazy('Download a spreadsheet of all payments or refunds that involve gift cards.')
+    repeatable_read = False
 
     def iterate_list(self, form_data):
         payments = OrderPayment.objects.filter(
@@ -1284,9 +1364,12 @@ class GiftcardRedemptionListExporter(ListExporter):
 class GiftcardListExporter(OrganizerLevelExportMixin, ListExporter):
     identifier = 'giftcardlist'
     verbose_name = gettext_lazy('Gift cards')
-    organizer_required_permission = 'can_manage_gift_cards'
     category = pgettext_lazy('export_category', 'Gift cards')
     description = gettext_lazy('Download a spreadsheet of all gift cards including their current value.')
+
+    @classmethod
+    def get_required_organizer_permission(cls) -> str:
+        return 'organizer.giftcards:read'
 
     @property
     def additional_form_fields(self):

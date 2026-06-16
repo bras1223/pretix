@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -31,7 +31,7 @@ from pretix.base.models import Event, Organizer, Team
 @pytest.fixture
 @scopes_disabled()
 def organizer():
-    return Organizer.objects.create(name="Dummy", slug="dummy")
+    return Organizer.objects.create(name="Dummy", slug="dummy", plugins='pretix.plugins.banktransfer')
 
 
 @pytest.fixture
@@ -68,18 +68,8 @@ def team(organizer):
         organizer=organizer,
         name="Test-Team",
         all_events=True,
-        can_change_teams=True,
-        can_manage_gift_cards=True,
-        can_change_items=True,
-        can_create_events=True,
-        can_change_event_settings=True,
-        can_change_vouchers=True,
-        can_view_vouchers=True,
-        can_view_orders=True,
-        can_change_orders=True,
-        can_manage_customers=True,
-        can_manage_reusable_media=True,
-        can_change_organizer_settings=True,
+        all_organizer_permissions=True,
+        all_event_permissions=True,
     )
 
 

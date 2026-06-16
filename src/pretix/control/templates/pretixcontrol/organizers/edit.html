@@ -12,7 +12,7 @@
         {% blocktrans with name=organizer.name %}Organizer settings{% endblocktrans %}
         {% if request.user.is_staff and staff_session %}
             <a href="{% url "control:organizer.delete" organizer=organizer.slug %}"
-                    class="btn btn-danger hidden-print">
+                    class="btn btn-danger hidden-print admin-only">
                 <span class="fa fa-trash"></span>
             </a>
         {% endif %}
@@ -132,6 +132,7 @@
                         <legend>{% trans "Customer accounts" %}</legend>
                         {% bootstrap_field sform.customer_accounts layout="control" %}
                         {% bootstrap_field sform.customer_accounts_native layout="control" %}
+                        {% bootstrap_field sform.customer_accounts_require_login_for_order_access layout="control" %}
                         {% bootstrap_field sform.customer_accounts_link_by_email layout="control" %}
                         {% bootstrap_field sform.name_scheme layout="control" %}
                         {% bootstrap_field sform.name_scheme_titles layout="control" %}

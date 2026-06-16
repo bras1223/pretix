@@ -65,8 +65,10 @@
 {% endblock %}
 </header>
 <div class="container main-box">
+    <main id="content">
     {% block page %}
     {% endblock %}
+    </main>
     <footer>
         {% block footer %}
         {% endblock %}
@@ -78,7 +80,7 @@
                 <li>{{ footer_text }}</li>
             {% endif %}
             {% for f in footer %}
-                <li><a href="{% safelink f.url %}" target="_blank" rel="noopener">{{ f.label }}</a></li>
+                <li><a class="{{ f.cssclass }}" href="{% safelink f.url %}" target="_blank" rel="noopener">{{ f.label }}</a></li>
             {% endfor %}
             {% include "pretixpresale/base_footer.html" %} {# removing or hiding this might be in violation of pretix' license #}
             </ul>

@@ -65,8 +65,6 @@ Endpoints
 
    Returns a list of all events within a given organizer the authenticated user/token has access to.
 
-   Permission required: "Can change event settings"
-
    **Example request**:
 
    .. sourcecode:: http
@@ -161,8 +159,6 @@ Endpoints
 
    Returns information on one event, identified by its slug.
 
-   Permission required: "Can change event settings"
-
    **Example request**:
 
    .. sourcecode:: http
@@ -233,8 +229,6 @@ Endpoints
 
    Please note that events cannot be created as 'live' using this endpoint. Quotas and payment must be added to the
    event before sales can go live.
-
-   Permission required: "Can create events"
 
    **Example request**:
 
@@ -338,8 +332,6 @@ Endpoints
    Please note that you can only copy from events under the same organizer this way. Use the ``clone_from`` parameter
    when creating a new event for this instead.
 
-   Permission required: "Can create events"
-
    **Example request**:
 
    .. sourcecode:: http
@@ -424,16 +416,14 @@ Endpoints
    :param organizer: The ``slug`` field of the organizer of the event to create.
    :param event: The ``slug`` field of the event to copy settings and items from.
    :statuscode 201: no error
-   :statuscode 400: The event could not be created due to invalid submitted data.
+   :statuscode 400: The event could not be updated due to invalid submitted data.
    :statuscode 401: Authentication failure
-   :statuscode 403: The requested organizer does not exist **or** you have no permission to create this resource.
+   :statuscode 403: The requested organizer does not exist **or** you have no permission to update this resource.
 
 
 .. http:patch:: /api/v1/organizers/(organizer)/events/(event)/
 
    Updates an event
-
-   Permission required: "Can change event settings"
 
    **Example request**:
 
@@ -510,8 +500,6 @@ Endpoints
 
    Delete an event. Note that events with orders cannot be deleted to ensure data integrity.
 
-   Permission required: "Can change event settings"
-
    **Example request**:
 
    .. sourcecode:: http
@@ -560,8 +548,6 @@ organizer level.
 .. http:get:: /api/v1/organizers/(organizer)/events/(event)/settings/
 
    Get current values of event settings.
-
-   Permission required: "Can change event settings" (Exception: with device auth, *some* settings can always be *read*.)
 
    **Example request**:
 
@@ -614,6 +600,8 @@ organizer level.
 .. http:patch:: /api/v1/organizers/(organizer)/events/(event)/settings/
 
    Updates event settings. Note that ``PUT`` is not allowed here, only ``PATCH``.
+
+   Permission "Can change event settings" is always required. Some keys require additional permissions.
 
     .. warning::
 

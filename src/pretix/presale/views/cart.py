@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -417,7 +417,7 @@ def get_or_create_cart_id(request, create=True):
     return new_id
 
 
-def cart_session(request):
+def cart_session(request, create=True):
     """
     Before pretix 1.8.0, all checkout-related information (like the entered email address) was stored
     in the user's regular session dictionary. This led to data interference and leaks for example if a
@@ -428,14 +428,16 @@ def cart_session(request):
     active cart session sub-dictionary for read and write access.
     """
     request.session.modified = True
-    cart_id = get_or_create_cart_id(request)
+    cart_id = get_or_create_cart_id(request, create=create)
+    if not cart_id and not create:
+        return None
     return request.session['carts'][cart_id]
 
 
 @method_decorator(allow_frame_if_namespaced, 'dispatch')
 class CartApplyVoucher(EventViewMixin, CartActionMixin, AsyncAction, View):
     task = apply_voucher
-    known_errortypes = ['CartError']
+    known_errortypes = ['CartError', 'CartPositionError']
 
     def get_success_message(self, value):
         return _('We applied the voucher to as many products in your cart as we could.')
@@ -513,7 +515,7 @@ class CartApplyVoucher(EventViewMixin, CartActionMixin, AsyncAction, View):
 @method_decorator(allow_frame_if_namespaced, 'dispatch')
 class CartRemove(EventViewMixin, CartActionMixin, AsyncAction, View):
     task = remove_cart_position
-    known_errortypes = ['CartError']
+    known_errortypes = ['CartError', 'CartPositionError']
 
     def get_success_message(self, value):
         if CartPosition.objects.filter(cart_id=get_or_create_cart_id(self.request)).exists():
@@ -542,7 +544,7 @@ class CartRemove(EventViewMixin, CartActionMixin, AsyncAction, View):
 @method_decorator(allow_frame_if_namespaced, 'dispatch')
 class CartClear(EventViewMixin, CartActionMixin, AsyncAction, View):
     task = clear_cart
-    known_errortypes = ['CartError']
+    known_errortypes = ['CartError', 'CartPositionError']
 
     def get_success_message(self, value):
         create_empty_cart_id(self.request)
@@ -555,10 +557,22 @@ class CartClear(EventViewMixin, CartActionMixin, AsyncAction, View):
                        request.sales_channel.identifier, time_machine_now(default=None))
 
 
+@method_decorator(allow_cors_if_namespaced, 'dispatch')
+class CartCreate(EventViewMixin, CartActionMixin, View):
+    def get(self, request, *args, **kwargs):
+        if 'ajax' in self.request.GET:
+            cart_id = get_or_create_cart_id(self.request, create=True)
+            return JsonResponse({
+                'cart_id': cart_id,
+            })
+        else:
+            return redirect_to_url(self.get_success_url())
+
+
 @method_decorator(allow_frame_if_namespaced, 'dispatch')
 class CartExtendReservation(EventViewMixin, CartActionMixin, AsyncAction, View):
     task = extend_cart_reservation
-    known_errortypes = ['CartError']
+    known_errortypes = ['CartError', 'CartPositionError']
 
     def _ajax_response_data(self, value):
         if isinstance(value, dict):
@@ -568,7 +582,11 @@ class CartExtendReservation(EventViewMixin, CartActionMixin, AsyncAction, View):
 
     def get_success_message(self, value):
         if value['success'] > 0:
-            return _('Your cart timeout was extended.')
+            if value.get('price_changed'):
+                return _('Your cart timeout was extended. Please note that some of the prices in your cart '
+                         'changed.')
+            else:
+                return _('Your cart timeout was extended.')
 
     def post(self, request, *args, **kwargs):
         return self.do(self.request.event.id, get_or_create_cart_id(self.request), translation.get_language(),
@@ -580,7 +598,7 @@ class CartExtendReservation(EventViewMixin, CartActionMixin, AsyncAction, View):
 @method_decorator(iframe_entry_view_wrapper, 'dispatch')
 class CartAdd(EventViewMixin, CartActionMixin, AsyncAction, View):
     task = add_items_to_cart
-    known_errortypes = ['CartError']
+    known_errortypes = ['CartError', 'CartPositionError']
 
     def get_success_message(self, value):
         if not self.request.event.is_voting and not self.request.event.is_form:
@@ -881,9 +899,13 @@ class AnswerDownload(EventViewMixin, View):
             return Http404()
 
         ftype, _ = mimetypes.guess_type(answer.file.name)
-        resp = FileResponse(answer.file, content_type=ftype or 'application/binary')
-        resp['Content-Disposition'] = 'attachment; filename="{}-cart-{}"'.format(
+        filename = '{}-cart-{}'.format(
             self.request.event.slug.upper(),
             os.path.basename(answer.file.name).split('.', 1)[1]
-        ).encode("ascii", "ignore")
+        )
+        resp = FileResponse(
+            answer.file,
+            filename=filename,
+            content_type=ftype or 'application/binary'
+        )
         return resp

@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -39,7 +39,7 @@ def vouchers_send(event: Event, vouchers: list, subject: str, message: str, reci
         with language(event.settings.locale):
             email_context = get_email_context(event=event, name=r.get('name') or '',
                                               voucher_list=[v.code for v in voucher_list])
-            mail(
+            outgoing_mail = mail(
                 r['email'],
                 subject,
                 LazyI18nString(message),
@@ -60,8 +60,8 @@ def vouchers_send(event: Event, vouchers: list, subject: str, message: str, reci
                     data={
                         'recipient': r['email'],
                         'name': r.get('name'),
-                        'subject': subject,
-                        'message': message,
+                        'subject': outgoing_mail.subject,
+                        'message': outgoing_mail.body_plain,
                     },
                     save=False
                 ))

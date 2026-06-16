@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -34,6 +34,11 @@ class ReusableMediaExporter(OrganizerLevelExportMixin, ListExporter):
     verbose_name = _('Reusable media')
     category = pgettext_lazy('export_category', 'Reusable media')
     description = _('Download a spread sheet with the data of all reusable medias on your account.')
+    repeatable_read = False
+
+    @classmethod
+    def get_required_organizer_permission(cls) -> str:
+        return "organizer.reusablemedia:read"
 
     def iterate_list(self, form_data):
         media = ReusableMedium.objects.filter(
@@ -56,18 +61,23 @@ class ReusableMediaExporter(OrganizerLevelExportMixin, ListExporter):
         yield headers
         yield self.ProgressSetTotal(total=media.count())
 
+        can_read_giftcards = self.permission_holder.has_organizer_permission(self.organizer, 'organizer.giftcards:read')
+
         for medium in media.iterator(chunk_size=1000):
-            row = [
+            giftcard_secret = medium.linked_giftcard.secret if medium.linked_giftcard_id else ''
+            if giftcard_secret and not can_read_giftcards:
+                giftcard_secret = giftcard_secret[:3] + "…"
+
+            yield [
                 medium.type,
                 medium.identifier,
                 _('Yes') if medium.active else _('No'),
                 date_format(medium.expires, 'SHORT_DATETIME_FORMAT') if medium.expires else '',
                 medium.customer.identifier if medium.customer_id else '',
                 f"{medium.linked_orderposition.order.code}-{medium.linked_orderposition.positionid}" if medium.linked_orderposition_id else '',
-                medium.linked_giftcard.secret if medium.linked_giftcard_id else '',
+                giftcard_secret,
                 medium.notes,
             ]
-            yield row
 
     def get_filename(self):
         return f'{self.organizer.slug}_media'

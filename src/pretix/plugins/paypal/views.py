@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -246,7 +246,7 @@ def webhook(request, *args, **kwargs):
     return HttpResponse(status=200)
 
 
-@event_permission_required('can_change_event_settings')
+@event_permission_required('event.settings.general:write')
 @require_POST
 def oauth_disconnect(request, **kwargs):
     del request.event.settings.payment_paypal_connect_refresh_token

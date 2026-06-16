@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -83,7 +83,7 @@ def check_against_prefix_list(u, allowlist):
 @receiver(nav_event_settings, dispatch_uid='returnurl_nav')
 def navbar_info(sender, request, **kwargs):
     url = resolve(request.path_info)
-    if not request.user.has_event_permission(request.organizer, request.event, 'can_change_event_settings',
+    if not request.user.has_event_permission(request.organizer, request.event, 'event.settings.general:write',
                                              request=request):
         return []
     return [{

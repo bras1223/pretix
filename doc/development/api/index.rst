@@ -13,10 +13,12 @@ Contents:
    email
    placeholder
    invoice
+   invoicetransmission
    shredder
    import
    customview
    cookieconsent
    auth
+   datasync
    general
    quality

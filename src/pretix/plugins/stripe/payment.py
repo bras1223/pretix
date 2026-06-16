@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -71,7 +71,6 @@ from pretix.base.payment import (
     BasePaymentProvider, PaymentException, WalletQueries,
 )
 from pretix.base.plugins import get_all_plugins
-from pretix.base.services.mail import SendMailException
 from pretix.base.settings import SettingsSandbox
 from pretix.helpers import OF_SELF
 from pretix.helpers.countries import CachedCountries
@@ -93,69 +92,89 @@ logger = logging.getLogger('pretix.plugins.stripe')
 # State of the payment methods
 #
 # Source: https://stripe.com/docs/payments/payment-methods/overview
-# Last Update: 2023-12-20
+# Last Update: 2026-06-12
 #
+# pretix Staff: Do not forget to enable/"On by default" newly added payment methods in
+# Stripe's managed payment methods configuration for the Stripe/pretix.eu connect platform.
+#
+# The categorization and order of payment methods is based on the list of the managed payment method configration
+# in the Stripe Dashboard.
+
 # Cards
 # - Credit and Debit Cards: ✓
-# - Apple, Google Pay: ✓
+#   * Cartes Bancaires: ✓
+#   * Korean cards: ✓
+#   * Japan installments: ✗
+#   * JCB: ✓
+#   * Meses sin intereses: ✗
 #
-# Bank debits
-# - ACH Debit: ✗
-# - Canadian PADs: ✗
-# - BACS Direct Debit: ✗
-# - SEPA Direct Debit: ✓
-# - BECS Direct Debit: ✗
+# Wallets
+# - Apple: ✓ (Cards)
+# - Google Pay: ✓ (Cards)
+# - Link: ✓ (PaymentRequestButton/Cards)
+# - Alipay: ✓
+# - Stablecoins and Crypto: ✗
+# - Kakao Pay: ✗
+# - Naver Pay: ✗
+# - MB Way: ✗
+# - Satis Pay: ✗
+# - WeChat Pay: ✓
+# - PAYCO: ✗
+# - PayPal: ✓ (No settings UI yet; incompatible with Connect+Direct Charges)
+# - Samsung pay: ✗
+# - MobilePay: ✓
+# - Revolut Pay: ✓
+# - Amazon Pay: ✗
+# - PayPay: ✗
+# - GrabPay: ✗
+# - Cash App Pay: ✗
+# - Secure Remote Commerce: ✗
 #
 # Bank redirects
 # - Bancontact: ✓
-# - BLIK: ✗
 # - EPS: ✓
-# - giropay: (deprecated)
 # - iDEAL: ✓
-# - P24: ✓
-# - Sofort: (deprecated)
-# - FPX: ✗
-# - PayNow: ✗
-# - UPI: ✗
-# - Netbanking: ✗
+# - Przelewy24: ✓
+# - BLIK: ✗
+# - Pay By Bank: ✓
 # - TWINT: ✓
-#
-# Bank transfers
-# - ACH Bank Transfer: ✗
-# - SEPA Bank Transfer: ✗
-# - UK Bank Transfer: ✗
-# - Multibanco: ✗
-# - Furikomi (Japan): ✗
-# - Mexico Bank Transfer: ✗
+# - Wero: ✓ (No settings UI yet)
+# - giropay: ✗ (deprecated)
+# - Sofort: ✗ (deprecated)
 #
 # Buy now, pay later
-# - Affirm: ✓
-# - Afterpay/Clearpay: ✗
+# - Billie: ✗
 # - Klarna: ✓
+# - Afterpay/Clearpay: ✗
 # - Zip: ✗
+# - Alma: ✗
+# - Affirm: ✓
+#
+# Bank debits
+# - SEPA Direct Debit: ✓
+# - ACH Direct Debit: ✗
+# - Australian BECS Direct Debit: ✗
+# - Canadian pre-authorized debits: ✗
+# - BACS Direct Debit: ✗
+# - FPX: ✗
+# - NZ BECS Direct Debit: ✗
+#
+# Bank transfers
+# - Bank Transfer: ✗
+#
+# Vouchers
+# - Multibanco: ✓
+# - Boleto: ✗
+# - Konbini: ✗
+# - OXXO: ✗
 #
 # Real-time payments
 # - Swish: ✓
-# - PayNow: ✗
-# - PromptPay: ✗
+# - UPI: ✗
 # - Pix: ✗
-#
-# Vouchers
-# - Konbini: ✗
-# - OXXO: ✗
-# - Boleto: ✗
-#
-# Wallets
-# - Apple Pay: ✓ (Cards)
-# - Google Pay: ✓ (Cards)
-# - Secure Remote Commerce: ✗
-# - Link: ✓ (PaymentRequestButton)
-# - Cash App Pay: ✗
-# - PayPal: ✓ (No settings UI yet)
-# - MobilePay: ✓
-# - Alipay: ✓
-# - WeChat Pay: ✓
-# - GrabPay: ✓
+# - PayTo: ✗
+# - PayNow: ✗
+# - PromptPay: ✓
 
 
 class StripeSettingsHolder(BasePaymentProvider):
@@ -367,7 +386,7 @@ class StripeSettingsHolder(BasePaymentProvider):
                      disabled=self.event.currency != 'EUR',
                      help_text=(
                          _('Some payment methods might need to be enabled in the settings of your Stripe account '
-                           'before work properly.') +
+                           'before they work properly.') +
                          '<div class="alert alert-warning">%s</div>' % _(
                              'SEPA Direct Debit payments via Stripe are <strong>not</strong> processed '
                              'instantly but might take up to <strong>14 days</strong> to be confirmed in some cases. '
@@ -412,6 +431,18 @@ class StripeSettingsHolder(BasePaymentProvider):
                                  'before they work properly.'),
                      required=False,
                  )),
+                ('method_pay_by_bank',
+                 forms.BooleanField(
+                     label=_('Pay by bank'),
+                     disabled=self.event.currency not in ['EUR', 'GBP'],
+                     help_text=' '.join([
+                         str(_('Some payment methods might need to be enabled in the settings of your Stripe account '
+                               'before they work properly.')),
+                         str(_('Currently only available for charges in GBP and customers with UK bank accounts, and '
+                               'in private preview for France and Germany.'))
+                     ]),
+                     required=False,
+                 )),
                 ('method_wechatpay',
                  forms.BooleanField(
                      label=_('WeChat Pay'),
@@ -423,7 +454,15 @@ class StripeSettingsHolder(BasePaymentProvider):
                 ('method_revolut_pay',
                  forms.BooleanField(
                      label='Revolut Pay',
-                     disabled=self.event.currency not in ['EUR', 'GBP'],
+                     disabled=self.event.currency not in ['EUR', 'GBP', 'RON', 'HUF', 'PLN', 'DKK'],
+                     help_text=_('Some payment methods might need to be enabled in the settings of your Stripe account '
+                                 'before they work properly.'),
+                     required=False,
+                 )),
+                ('method_promptpay',
+                 forms.BooleanField(
+                     label='PromptPay',
+                     disabled=self.event.currency != 'THB',
                      help_text=_('Some payment methods might need to be enabled in the settings of your Stripe account '
                                  'before they work properly.'),
                      required=False,
@@ -490,6 +529,15 @@ class StripeSettingsHolder(BasePaymentProvider):
                                  'before they work properly.'),
                      required=False,
                  )),
+                # Disabled for now, since still in closed Beta and only available to dedicated boarded accounts.
+                # ('method_wero',
+                #  forms.BooleanField(
+                #     label=_('Wero'),
+                #      disabled=self.event.currency not in 'EUR',
+                #      help_text=_('Some payment methods might need to be enabled in the settings of your Stripe account '
+                #                  'before they work properly.'),
+                #      required=False,
+                #  )),
             ] + extra_fields + list(super().settings_form_fields.items()) + moto_settings
         )
         if not self.settings.connect_client_id or self.settings.secret_key:
@@ -980,9 +1028,6 @@ class StripeMethod(BasePaymentProvider):
                     payment.confirm()
                 except Quota.QuotaExceededException as e:
                     raise PaymentException(str(e))
-
-                except SendMailException:
-                    raise PaymentException(_('There was an error sending the confirmation mail.'))
             elif intent.status == 'processing':
                 if request:
                     messages.warning(request, _('Your payment is pending completion. We will inform you as soon as the '
@@ -1524,7 +1569,7 @@ class StripeGiropay(StripeRedirectWithAccountNamePaymentIntentMethod):
 class StripeIdeal(StripeRedirectMethod):
     identifier = 'stripe_ideal'
     verbose_name = _('iDEAL via Stripe')
-    public_name = _('iDEAL')
+    public_name = _('iDEAL | Wero')
     method = 'ideal'
     explanation = _(
         'iDEAL is an online payment method available to customers of Dutch banks. Please keep your online '
@@ -1810,6 +1855,32 @@ class StripeRevolutPay(StripeRedirectMethod):
         }
 
 
+class StripePayByBank(StripeRedirectMethod):
+    identifier = 'stripe_pay_by_bank'
+    verbose_name = _('Pay by bank via Stripe')
+    public_name = _('Pay by bank')
+    method = 'pay_by_bank'
+    redirect_in_widget_allowed = False
+    confirmation_method = 'automatic'
+    explanation = _(
+        'Pay by bank allows you to authorize a secure Open Banking payment from your banking app. Currently available '
+        'only with a UK bank account.'
+    )
+
+    def is_allowed(self, request: HttpRequest, total: Decimal=None) -> bool:
+        return super().is_allowed(request, total) and self.event.currency == 'GBP'
+
+    def _payment_intent_kwargs(self, request, payment):
+        return {
+            "payment_method_data": {
+                "type": "pay_by_bank",
+                "billing_details": {
+                    "email": payment.order.email,
+                },
+            },
+        }
+
+
 class StripePayPal(StripeRedirectMethod):
     identifier = 'stripe_paypal'
     verbose_name = _('PayPal via Stripe')
@@ -1839,6 +1910,30 @@ class StripeSwish(StripeRedirectMethod):
                     "reference": payment.order.full_code,
                 },
             }
+        }
+
+
+class StripePromptPay(StripeRedirectMethod):
+    identifier = 'stripe_promptpay'
+    verbose_name = _('PromptPay via Stripe')
+    public_name = 'PromptPay'
+    method = 'promptpay'
+    confirmation_method = 'automatic'
+    explanation = _(
+        'This payment method is available to PromptPay users in Thailand. Please have your app ready.'
+    )
+
+    def is_allowed(self, request: HttpRequest, total: Decimal=None) -> bool:
+        return super().is_allowed(request, total) and request.event.currency == "THB"
+
+    def _payment_intent_kwargs(self, request, payment):
+        return {
+            "payment_method_data": {
+                "type": "promptpay",
+                "billing_details": {
+                    "email": payment.order.email,
+                },
+            },
         }
 
 
@@ -1880,3 +1975,15 @@ class StripeMobilePay(StripeRedirectMethod):
                 "type": "mobilepay",
             },
         }
+
+
+class StripeWero(StripeRedirectMethod):
+    identifier = 'stripe_wero'
+    verbose_name = _('WERO via Stripe')
+    public_name = 'WERO'
+    method = 'wero'
+    confirmation_method = 'automatic'
+    explanation = _(
+        'This payment method is available to European online banking users, whose banking institutions support WERO '
+        'either through their native banking apps or through the WERO wallet app. Please have you app ready.'
+    )

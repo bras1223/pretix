@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -23,7 +23,6 @@ import json
 from decimal import Decimal
 from typing import Optional
 
-import jsonschema
 from django.contrib.staticfiles import finders
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -298,6 +297,8 @@ def cc_to_vat_prefix(country_code):
 @deconstructible
 class CustomRulesValidator:
     def __call__(self, value):
+        import jsonschema
+
         if not isinstance(value, dict):
             try:
                 val = json.loads(value)

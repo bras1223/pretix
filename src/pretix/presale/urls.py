@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -91,6 +91,9 @@ event_patterns = [
     re_path(r'w/(?P<cart_namespace>[a-zA-Z0-9]{16})/cart/add',
             csrf_exempt(pretix.presale.views.cart.CartAdd.as_view()),
             name='event.cart.add'),
+    re_path(r'w/(?P<cart_namespace>[a-zA-Z0-9]{16})/cart/create',
+            csrf_exempt(pretix.presale.views.cart.CartCreate.as_view()),
+            name='event.cart.create'),
 
     re_path(r'unlock/(?P<hash>[a-z0-9]{64})/$', pretix.presale.views.user.UnlockHashView.as_view(),
             name='event.payment.unlock'),
@@ -214,6 +217,8 @@ organizer_patterns = [
     re_path(r'^account/confirmchange$', pretix.presale.views.customer.ConfirmChangeView.as_view(), name='organizer.customer.change.confirm'),
     re_path(r'^account/memberships$', pretix.presale.views.customer.MembershipView.as_view(), name='organizer.customer.memberships'),
     re_path(r'^account/memberships/(?P<id>\d+)/$', pretix.presale.views.customer.MembershipUsageView.as_view(), name='organizer.customer.membership'),
+    re_path(r'^account/giftcards$', pretix.presale.views.customer.GiftcardView.as_view(),
+            name='organizer.customer.giftcards'),
     re_path(r'^account/addresses$', pretix.presale.views.customer.AddressView.as_view(), name='organizer.customer.addresses'),
     re_path(r'^account/addresses/(?P<id>\d+)/delete$', pretix.presale.views.customer.AddressDeleteView.as_view(), name='organizer.customer.address.delete'),
     re_path(r'^account/profiles$', pretix.presale.views.customer.ProfileView.as_view(), name='organizer.customer.profiles'),

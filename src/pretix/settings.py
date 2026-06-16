@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -157,7 +157,7 @@ DATABASES = {
         'HOST': config.get('database', 'host', fallback=''),
         'PORT': config.get('database', 'port', fallback=''),
         'CONN_MAX_AGE': 0 if db_backend == 'sqlite3' else 120,
-        'CONN_HEALTH_CHECKS': db_backend != 'sqlite3',  # Will only be used from Django 4.1 onwards
+        'CONN_HEALTH_CHECKS': db_backend != 'sqlite3',
         'DISABLE_SERVER_SIDE_CURSORS': db_disable_server_side_cursors,
         'OPTIONS': db_options,
         'TEST': {}
@@ -178,6 +178,21 @@ if config.has_section('replica'):
         'TEST': {}
     }
     DATABASE_ROUTERS = ['pretix.helpers.database.ReplicaRouter']
+
+if config.has_section('dbreadonly'):
+    DATABASES['readonly'] = {
+        'ENGINE': 'django.db.backends.' + db_backend,
+        'NAME': config.get('dbreadonly', 'name', fallback=DATABASES['default']['NAME']),
+        'USER': config.get('dbreadonly', 'user', fallback=DATABASES['default']['USER']),
+        'PASSWORD': config.get('dbreadonly', 'password', fallback=DATABASES['default']['PASSWORD']),
+        'HOST': config.get('dbreadonly', 'host', fallback=DATABASES['default']['HOST']),
+        'PORT': config.get('dbreadonly', 'port', fallback=DATABASES['default']['PORT']),
+        'CONN_MAX_AGE': 0,  # do not spam primary with open connections as long as readonly is only used occasionally
+        'CONN_HEALTH_CHECKS': db_backend != 'sqlite3',
+        'DISABLE_SERVER_SIDE_CURSORS': db_disable_server_side_cursors,
+        'OPTIONS': db_options,
+        'TEST': {}
+    }
 
 STATIC_URL = config.get('urls', 'static', fallback='/static/')
 
@@ -208,15 +223,22 @@ CSRF_TRUSTED_ORIGINS = [urlparse(SITE_URL).scheme + '://' + urlparse(SITE_URL).h
 
 TRUST_X_FORWARDED_FOR = config.getboolean('pretix', 'trust_x_forwarded_for', fallback=False)
 USE_X_FORWARDED_HOST = config.getboolean('pretix', 'trust_x_forwarded_host', fallback=False)
+ALLOW_HTTP_TO_PRIVATE_NETWORKS = config.getboolean('pretix', 'allow_http_to_private_networks', fallback=False)
 
 
 REQUEST_ID_HEADER = config.get('pretix', 'request_id_header', fallback=False)
+if REQUEST_ID_HEADER in config.cp.BOOLEAN_STATES:
+    raise ImproperlyConfigured(
+        "request_id_header should be set to a header name, not a boolean value."
+    )
 
 if config.getboolean('pretix', 'trust_x_forwarded_proto', fallback=False):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 PRETIX_PLUGINS_DEFAULT = config.get('pretix', 'plugins_default',
                                     fallback='pretix.plugins.sendmail,pretix.plugins.statistics,pretix.plugins.checkinlists')
+PRETIX_PLUGINS_ORGANIZER_DEFAULT = config.get('pretix', 'plugins_organizer_default',
+                                              fallback='')
 PRETIX_PLUGINS_EXCLUDE = config.get('pretix', 'plugins_exclude', fallback='').split(',')
 PRETIX_PLUGINS_SHOW_META = config.getboolean('pretix', 'plugins_show_meta', fallback=True)
 
@@ -242,7 +264,8 @@ EMAIL_HOST_PASSWORD = config.get('mail', 'password', fallback='')
 EMAIL_USE_TLS = config.getboolean('mail', 'tls', fallback=False)
 EMAIL_USE_SSL = config.getboolean('mail', 'ssl', fallback=False)
 EMAIL_SUBJECT_PREFIX = '[pretix] '
-EMAIL_BACKEND = EMAIL_CUSTOM_SMTP_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_CUSTOM_SMTP_BACKEND = 'pretix.base.email.CheckPrivateNetworkSmtpBackend'
 EMAIL_TIMEOUT = 60
 
 ADMINS = [('Admin', n) for n in config.get('mail', 'admins', fallback='').split(",") if n]
@@ -345,11 +368,53 @@ if HAS_CELERY:
     CELERY_RESULT_BACKEND = config.get('celery', 'backend')
     if HAS_CELERY_BROKER_TRANSPORT_OPTS:
         CELERY_BROKER_TRANSPORT_OPTIONS = loads(config.get('celery', 'broker_transport_options'))
+    else:
+        CELERY_BROKER_TRANSPORT_OPTIONS = {}
     if HAS_CELERY_BACKEND_TRANSPORT_OPTS:
         CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = loads(config.get('celery', 'backend_transport_options'))
     CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+    if CELERY_BROKER_URL.startswith("amqp://"):
+        # https://docs.celeryq.dev/en/latest/userguide/routing.html#routing-options-rabbitmq-priorities
+        # Enable priorities for all queues
+        CELERY_TASK_QUEUE_MAX_PRIORITY = 3
+        # On RabbitMQ, higher number is higher priority, and having less levels makes rabbitmq use less CPU and RAM
+        PRIORITY_CELERY_LOW = 1
+        PRIORITY_CELERY_MID = 2
+        PRIORITY_CELERY_HIGH = 3
+        PRIORITY_CELERY_LOWEST_FUNC = min
+        PRIORITY_CELERY_HIGHEST_FUNC = max
+        # Set default
+        CELERY_TASK_DEFAULT_PRIORITY = PRIORITY_CELERY_MID
+    elif CELERY_BROKER_URL.startswith("redis://"):
+        # https://docs.celeryq.dev/en/latest/userguide/routing.html#redis-message-priorities
+        CELERY_BROKER_TRANSPORT_OPTIONS.update({
+            "queue_order_strategy": "priority",
+            "sep": ":",
+            "priority_steps": [0, 4, 8]
+        })
+        # On redis, lower number is higher priority, and it appears that there are always levels 0-9 even though it
+        # is only really executed based on the 3 steps listed above.
+        PRIORITY_CELERY_LOW = 9
+        PRIORITY_CELERY_MID = 5
+        PRIORITY_CELERY_HIGH = 0
+        PRIORITY_CELERY_LOWEST_FUNC = max
+        PRIORITY_CELERY_HIGHEST_FUNC = min
+        CELERY_TASK_DEFAULT_PRIORITY = PRIORITY_CELERY_MID
+    else:
+        # No priority support assumed
+        PRIORITY_CELERY_LOW = 0
+        PRIORITY_CELERY_MID = 0
+        PRIORITY_CELERY_HIGH = 0
+        PRIORITY_CELERY_LOWEST_FUNC = min
+        PRIORITY_CELERY_HIGHEST_FUNC = max
 else:
     CELERY_TASK_ALWAYS_EAGER = True
+    PRIORITY_CELERY_LOW = 0
+    PRIORITY_CELERY_MID = 0
+    PRIORITY_CELERY_HIGH = 0
+    PRIORITY_CELERY_LOWEST_FUNC = min
+    PRIORITY_CELERY_HIGHEST_FUNC = max
 
 CACHE_TICKETS_HOURS = config.getint('cache', 'tickets', fallback=24 * 3)
 
@@ -450,6 +515,7 @@ MIDDLEWARE = [
     'pretix.control.middleware.AuditLogMiddleware',
     'pretix.base.middleware.LocaleMiddleware',
     'pretix.base.middleware.SecurityMiddleware',
+    'pretix.base.middleware.RejectInvalidInputMiddleware',
     'pretix.presale.middleware.EventMiddleware',
     'pretix.api.middleware.ApiScopeMiddleware',
 ]
@@ -486,6 +552,7 @@ X_FRAME_OPTIONS = 'DENY'
 
 # URL settings
 ROOT_URLCONF = 'pretix.multidomain.maindomain_urlconf'
+FORMS_URLFIELD_ASSUME_HTTPS = True  # transitional for django 6.0
 
 WSGI_APPLICATION = 'pretix.wsgi.application'
 
@@ -612,6 +679,11 @@ LOGGING = {
             'handlers': ['null'],
             'propagate': False,
         },
+        'celery.utils.functional': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',  # Do not output all the queries
+            'propagate': False,
+        },
         'django.db.backends': {
             'handlers': ['file', 'console'],
             'level': 'INFO',  # Do not output all the queries
@@ -711,6 +783,7 @@ BOOTSTRAP3 = {
         'bulkedit_inline': 'pretix.control.forms.renderers.InlineBulkEditFieldRenderer',
         'checkout': 'pretix.presale.forms.renderers.CheckoutFieldRenderer',
     },
+    'set_placeholder': False,
 }
 
 PASSWORD_HASHERS = [
@@ -805,6 +878,8 @@ COUNTRIES_OVERRIDE = {
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 25000
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 
+OUTGOING_MAIL_RETENTION = 14 * 24 * 3600  # 14 days in seonds
+
 # File sizes are in MiB
 FILE_UPLOAD_MAX_SIZE_IMAGE = 1024 * 1024 * config.getint("pretix_file_upload", "max_size_image", fallback=10)
 FILE_UPLOAD_MAX_SIZE_FAVICON = 1024 * 1024 * config.getint("pretix_file_upload", "max_size_favicon", fallback=1)
@@ -813,3 +888,10 @@ FILE_UPLOAD_MAX_SIZE_EMAIL_AUTO_ATTACHMENT = 1024 * 1024 * config.getint("pretix
 FILE_UPLOAD_MAX_SIZE_OTHER = 1024 * 1024 * config.getint("pretix_file_upload", "max_size_other", fallback=10)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+VITE_DEV_SERVER_PORT = 5173
+VITE_DEV_SERVER = f"http://localhost:{VITE_DEV_SERVER_PORT}"
+VITE_DEV_MODE = DEBUG
+VITE_IGNORE = False  # Used to ignore `collectstatic`/`rebuild`
+PRETIX_WIDGET_VITE = os.environ.get('PRETIX_WIDGET_VITE', '') not in ('', '0')

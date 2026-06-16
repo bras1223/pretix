@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -19,7 +19,9 @@
 # You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 # <https://www.gnu.org/licenses/>.
 #
+import operator
 from decimal import Decimal
+from functools import reduce
 
 import django_filters
 from django.contrib.auth.hashers import make_password
@@ -48,15 +50,18 @@ from pretix.api.serializers.organizer import (
     TeamInviteSerializer, TeamMemberSerializer, TeamSerializer,
 )
 from pretix.base.models import (
-    Customer, Device, GiftCard, GiftCardTransaction, Membership,
-    MembershipType, Organizer, SalesChannel, SeatingPlan, Team, TeamAPIToken,
-    TeamInvite, User,
+    Customer, Device, Event, GiftCard, GiftCardTransaction, LogEntry,
+    Membership, MembershipType, Organizer, SalesChannel, SeatingPlan, Team,
+    TeamAPIToken, TeamInvite, User,
+)
+from pretix.base.plugins import (
+    PLUGIN_LEVEL_EVENT, PLUGIN_LEVEL_EVENT_ORGANIZER_HYBRID,
 )
 from pretix.helpers import OF_SELF
 from pretix.helpers.dicts import merge_dicts
 
 
-class OrganizerViewSet(viewsets.ReadOnlyModelViewSet):
+class OrganizerViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = OrganizerSerializer
     queryset = Organizer.objects.none()
     lookup_field = 'slug'
@@ -65,6 +70,7 @@ class OrganizerViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = (TotalOrderingFilter,)
     ordering = ('slug',)
     ordering_fields = ('name', 'slug')
+    write_permission = "organizer.settings.general:write"
 
     def get_queryset(self):
         if self.request.user.is_authenticated:
@@ -83,12 +89,73 @@ class OrganizerViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             return Organizer.objects.filter(pk=self.request.auth.team.organizer_id)
 
+    @transaction.atomic()
+    def perform_update(self, serializer):
+        from pretix.base.plugins import get_all_plugins
+
+        original_data = self.get_serializer(instance=serializer.instance).data
+
+        current_plugins_value = serializer.instance.get_plugins()
+        updated_plugins_value = serializer.validated_data.get('plugins', None)
+
+        super().perform_update(serializer)
+
+        if serializer.data == original_data:
+            # Performance optimization: If nothing was changed, we do not need to save or log anything.
+            # This costs us a few cycles on save, but avoids thousands of lines in our log.
+            return
+
+        if updated_plugins_value is not None and set(updated_plugins_value) != set(current_plugins_value):
+            enabled = {m: 'enabled' for m in updated_plugins_value if m not in current_plugins_value}
+            disabled = {m: 'disabled' for m in current_plugins_value if m not in updated_plugins_value}
+            changed = merge_dicts(enabled, disabled)
+
+            plugins_available = {
+                p.module: p
+                for p in get_all_plugins(organizer=serializer.instance)
+                if not p.name.startswith('.') and getattr(p, 'visible', True)
+            }
+            qs = []
+            for module in disabled:
+                pluginmeta = plugins_available[module]
+                level = getattr(pluginmeta, 'level', PLUGIN_LEVEL_EVENT)
+                if level == PLUGIN_LEVEL_EVENT_ORGANIZER_HYBRID:
+                    qs.append(Q(plugins__regex='(^|,)' + module + '(,|$)'))
+
+            if qs:
+                events_to_disable = set(self.request.organizer.events.filter(
+                    reduce(operator.or_, qs)
+                ).values_list("pk", flat=True))
+                logentries_to_save = []
+                events_to_save = []
+
+                for e in self.request.organizer.events.filter(pk__in=events_to_disable):
+                    for module in disabled:
+                        if module in e.get_plugins():
+                            logentries_to_save.append(
+                                e.log_action('pretix.event.plugins.disabled', user=self.request.user, auth=self.request.auth,
+                                             data={'plugin': module}, save=False)
+                            )
+                            e.disable_plugin(module)
+                            events_to_save.append(e)
+
+                Event.objects.bulk_update(events_to_save, fields=["plugins"])
+                LogEntry.objects.bulk_create(logentries_to_save)
+
+            for module, operation in changed.items():
+                serializer.instance.log_action(
+                    'pretix.organizer.plugins.' + operation,
+                    user=self.request.user,
+                    auth=self.request.auth,
+                    data={'plugin': module}
+                )
+
 
 class SeatingPlanViewSet(viewsets.ModelViewSet):
     serializer_class = SeatingPlanSerializer
     queryset = SeatingPlan.objects.none()
-    permission = 'can_change_organizer_settings'
-    write_permission = 'can_change_organizer_settings'
+    permission = None
+    write_permission = 'organizer.seatingplans:write'
 
     def get_queryset(self):
         return self.request.organizer.seating_plans.order_by('name')
@@ -154,8 +221,8 @@ with scopes_disabled():
 class GiftCardViewSet(viewsets.ModelViewSet):
     serializer_class = GiftCardSerializer
     queryset = GiftCard.objects.none()
-    permission = 'can_manage_gift_cards'
-    write_permission = 'can_manage_gift_cards'
+    permission = 'organizer.giftcards:read'
+    write_permission = 'organizer.giftcards:write'
     filter_backends = (DjangoFilterBackend,)
     filterset_class = GiftCardFilter
 
@@ -182,12 +249,24 @@ class GiftCardViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         value = serializer.validated_data.pop('value')
         inst = serializer.save(issuer=self.request.organizer)
-        inst.transactions.create(value=value, acceptor=self.request.organizer)
         inst.log_action(
-            'pretix.giftcards.transaction.manual',
+            action='pretix.giftcards.created',
             user=self.request.user,
             auth=self.request.auth,
-            data=merge_dicts(self.request.data, {'id': inst.pk})
+        )
+        inst.transactions.create(value=value, acceptor=self.request.organizer)
+        inst.log_action(
+            action='pretix.giftcards.transaction.manual',
+            user=self.request.user,
+            auth=self.request.auth,
+            data=merge_dicts(
+                self.request.data,
+                {
+                    'id': inst.pk,
+                    'acceptor_id': self.request.organizer.id,
+                    'acceptor_slug': self.request.organizer.slug
+                }
+            )
         )
 
     @transaction.atomic()
@@ -202,7 +281,7 @@ class GiftCardViewSet(viewsets.ModelViewSet):
             inst = serializer.save(secret=serializer.instance.secret, currency=serializer.instance.currency,
                                    testmode=serializer.instance.testmode)
             inst.log_action(
-                'pretix.giftcards.modified',
+                action='pretix.giftcards.modified',
                 user=self.request.user,
                 auth=self.request.auth,
                 data=self.request.data,
@@ -215,10 +294,14 @@ class GiftCardViewSet(viewsets.ModelViewSet):
             diff = value - old_value
             inst.transactions.create(value=diff, acceptor=self.request.organizer)
             inst.log_action(
-                'pretix.giftcards.transaction.manual',
+                action='pretix.giftcards.transaction.manual',
                 user=self.request.user,
                 auth=self.request.auth,
-                data={'value': diff}
+                data={
+                    'value': diff,
+                    'acceptor_id': self.request.organizer.id,
+                    'acceptor_slug': self.request.organizer.slug
+                }
             )
 
         return inst
@@ -242,10 +325,15 @@ class GiftCardViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_409_CONFLICT)
         gc.transactions.create(value=value, text=text, info=info, acceptor=self.request.organizer)
         gc.log_action(
-            'pretix.giftcards.transaction.manual',
+            action='pretix.giftcards.transaction.manual',
             user=self.request.user,
             auth=self.request.auth,
-            data={'value': value, 'text': text}
+            data={
+                'value': value,
+                'text': text,
+                'acceptor_id': self.request.organizer.id,
+                'acceptor_slug': self.request.organizer.slug
+            }
         )
         return Response(GiftCardSerializer(gc, context=self.get_serializer_context()).data, status=status.HTTP_200_OK)
 
@@ -256,8 +344,8 @@ class GiftCardViewSet(viewsets.ModelViewSet):
 class GiftCardTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = GiftCardTransactionSerializer
     queryset = GiftCardTransaction.objects.none()
-    permission = 'can_manage_gift_cards'
-    write_permission = 'can_manage_gift_cards'
+    permission = 'organizer.giftcards:read'
+    write_permission = 'organizer.giftcards:write'
 
     @cached_property
     def giftcard(self):
@@ -274,8 +362,8 @@ class GiftCardTransactionViewSet(viewsets.ReadOnlyModelViewSet):
 class TeamViewSet(viewsets.ModelViewSet):
     serializer_class = TeamSerializer
     queryset = Team.objects.none()
-    permission = 'can_change_teams'
-    write_permission = 'can_change_teams'
+    permission = 'organizer.teams:write'
+    write_permission = 'organizer.teams:write'
 
     def get_queryset(self):
         return self.request.organizer.teams.order_by('pk')
@@ -314,8 +402,8 @@ class TeamViewSet(viewsets.ModelViewSet):
 class TeamMemberViewSet(DestroyModelMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = TeamMemberSerializer
     queryset = User.objects.none()
-    permission = 'can_change_teams'
-    write_permission = 'can_change_teams'
+    permission = 'organizer.teams:write'
+    write_permission = 'organizer.teams:write'
 
     @cached_property
     def team(self):
@@ -343,8 +431,8 @@ class TeamMemberViewSet(DestroyModelMixin, viewsets.ReadOnlyModelViewSet):
 class TeamInviteViewSet(CreateModelMixin, DestroyModelMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = TeamInviteSerializer
     queryset = TeamInvite.objects.none()
-    permission = 'can_change_teams'
-    write_permission = 'can_change_teams'
+    permission = 'organizer.teams:write'
+    write_permission = 'organizer.teams:write'
 
     @cached_property
     def team(self):
@@ -380,8 +468,8 @@ class TeamInviteViewSet(CreateModelMixin, DestroyModelMixin, viewsets.ReadOnlyMo
 class TeamAPITokenViewSet(CreateModelMixin, DestroyModelMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = TeamAPITokenSerializer
     queryset = TeamAPIToken.objects.none()
-    permission = 'can_change_teams'
-    write_permission = 'can_change_teams'
+    permission = 'organizer.teams:write'
+    write_permission = 'organizer.teams:write'
 
     @cached_property
     def team(self):
@@ -444,8 +532,8 @@ class DeviceViewSet(mixins.CreateModelMixin,
                     GenericViewSet):
     serializer_class = DeviceSerializer
     queryset = Device.objects.none()
-    permission = 'can_change_organizer_settings'
-    write_permission = 'can_change_organizer_settings'
+    permission = 'organizer.devices:read'
+    write_permission = 'organizer.devices:write'
     lookup_field = 'device_id'
 
     def get_queryset(self):
@@ -454,6 +542,9 @@ class DeviceViewSet(mixins.CreateModelMixin,
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
         ctx['organizer'] = self.request.organizer
+        ctx['can_see_tokens'] = (
+            self.request.user if self.request.user and self.request.user.is_authenticated else self.request.auth
+        ).has_organizer_permission(self.request.organizer, 'organizer.devices:write', request=self.request)
         return ctx
 
     @transaction.atomic()
@@ -479,11 +570,12 @@ class DeviceViewSet(mixins.CreateModelMixin,
 
 
 class OrganizerSettingsView(views.APIView):
-    permission = 'can_change_organizer_settings'
+    permission = None
+    write_permission = 'organizer.settings.general:write'
 
     def get(self, request, *args, **kwargs):
         s = OrganizerSettingsSerializer(instance=request.organizer.settings, organizer=request.organizer, context={
-            'request': request
+            'request': request, 'permissions': request.orgapermset
         })
         if 'explain' in request.GET:
             return Response({
@@ -500,7 +592,7 @@ class OrganizerSettingsView(views.APIView):
         s = OrganizerSettingsSerializer(
             instance=request.organizer.settings, data=request.data, partial=True,
             organizer=request.organizer, context={
-                'request': request
+                'request': request, 'permissions': request.orgapermset
             }
         )
         s.is_valid(raise_exception=True)
@@ -512,7 +604,7 @@ class OrganizerSettingsView(views.APIView):
                 }
             )
         s = OrganizerSettingsSerializer(instance=request.organizer.settings, organizer=request.organizer, context={
-            'request': request
+            'request': request, 'permissions': request.orgapermset
         })
         return Response(s.data)
 
@@ -529,7 +621,8 @@ with scopes_disabled():
 class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     queryset = Customer.objects.none()
-    permission = 'can_manage_customers'
+    permission = 'organizer.customers:read'
+    write_permission = 'organizer.customers:write'
     lookup_field = 'identifier'
     filter_backends = (DjangoFilterBackend,)
     filterset_class = CustomerFilter
@@ -589,7 +682,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
 class MembershipTypeViewSet(viewsets.ModelViewSet):
     serializer_class = MembershipTypeSerializer
     queryset = MembershipType.objects.none()
-    permission = 'can_change_organizer_settings'
+    permission = 'organizer.settings.general:write'
 
     def get_queryset(self):
         qs = self.request.organizer.membership_types.all()
@@ -646,14 +739,15 @@ with scopes_disabled():
 class MembershipViewSet(viewsets.ModelViewSet):
     serializer_class = MembershipSerializer
     queryset = Membership.objects.none()
-    permission = 'can_manage_customers'
+    permission = 'organizer.customers:read'
+    write_permission = 'organizer.customers:write'
     filter_backends = (DjangoFilterBackend,)
     filterset_class = MembershipFilter
 
     def get_queryset(self):
         return Membership.objects.filter(
             customer__organizer=self.request.organizer
-        )
+        ).select_related('customer')
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
@@ -696,8 +790,8 @@ with scopes_disabled():
 class SalesChannelViewSet(viewsets.ModelViewSet):
     serializer_class = SalesChannelSerializer
     queryset = SalesChannel.objects.none()
-    permission = 'can_change_organizer_settings'
-    write_permission = 'can_change_organizer_settings'
+    permission = 'organizer.settings.general:write'
+    write_permission = 'organizer.settings.general:write'
     filter_backends = (DjangoFilterBackend,)
     filterset_class = SalesChannelFilter
     lookup_field = 'identifier'

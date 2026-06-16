@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -45,7 +45,9 @@ from django.utils.translation import gettext as _
 from django_scopes import scope
 
 from pretix.base.models import Event, Organizer
-from pretix.base.models.auth import SuperuserPermissionSet, User
+from pretix.base.models.auth import (
+    EventPermissionSet, OrganizerPermissionSet, SuperuserPermissionSet, User,
+)
 from pretix.helpers.http import redirect_to_url
 from pretix.helpers.security import (
     Session2FASetupRequired, SessionInvalid, SessionPasswordChangeRequired,
@@ -72,7 +74,7 @@ class PermissionMiddleware:
     )
 
     EXCEPTIONS_FORCED_PW_CHANGE = (
-        "user.settings",
+        "user.settings.password.change",
         "auth.logout"
     )
 
@@ -139,7 +141,7 @@ class PermissionMiddleware:
                 return redirect_to_url(reverse('control:user.reauth') + '?next=' + quote(request.get_full_path()))
         except SessionPasswordChangeRequired:
             if url_name not in self.EXCEPTIONS_FORCED_PW_CHANGE:
-                return redirect_to_url(reverse('control:user.settings') + '?next=' + quote(request.get_full_path()))
+                return redirect_to_url(reverse('control:user.settings.password.change') + '?next=' + quote(request.get_full_path()))
         except Session2FASetupRequired:
             if url_name not in self.EXCEPTIONS_2FA:
                 return redirect_to_url(reverse('control:user.settings.2fa'))
@@ -170,7 +172,7 @@ class PermissionMiddleware:
             if request.user.has_active_staff_session(request.session.session_key):
                 request.eventpermset = SuperuserPermissionSet()
             else:
-                request.eventpermset = request.user.get_event_permission_set(request.organizer, request.event)
+                request.eventpermset = EventPermissionSet(request.user.get_event_permission_set(request.organizer, request.event))
         elif 'organizer' in url.kwargs:
             if url.kwargs['organizer'] == '-':
                 # This is a hack that just takes the user to ANY organizer. It's useful to link to features in support
@@ -192,7 +194,7 @@ class PermissionMiddleware:
             if request.user.has_active_staff_session(request.session.session_key):
                 request.orgapermset = SuperuserPermissionSet()
             else:
-                request.orgapermset = request.user.get_organizer_permission_set(request.organizer)
+                request.orgapermset = OrganizerPermissionSet(request.user.get_organizer_permission_set(request.organizer))
 
         with scope(organizer=getattr(request, 'organizer', None)):
             r = self.get_response(request)

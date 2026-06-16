@@ -10,7 +10,9 @@ analytics
 anonymize
 anonymized
 Auth
+authentification
 authenticator
+Authenticator
 automatical
 availabilities
 backend
@@ -21,6 +23,7 @@ barcodes
 Bcc
 BCC
 BezahlCode
+biometric
 BLIK
 blocklist
 BN
@@ -49,14 +52,17 @@ DSS
 DNS
 EEA
 eInvoices
+enqueued
 EPC
 EPS
 eps
 favicon
 filetype
+freeOTP
 frontend
 frontpage
 Galician
+GBP
 GENEXAMPLE
 Geo
 geo
@@ -90,6 +96,7 @@ Melilla
 Mercado
 MerchantID
 Mifare
+Misconfiguration
 MobilePay
 MOTO
 Multibanco
@@ -97,6 +104,7 @@ Mx
 MyBank
 multiline
 NFC
+NIF
 NREI
 NXP
 OpenCage
@@ -106,8 +114,10 @@ overpayment
 OXXO
 Pago
 PayU
+Peppol
 PCI
 PKCE
+PLN
 PDFs
 percentual
 personalization
@@ -123,6 +133,7 @@ pretixdroid
 pretixPOS
 pretixPRINT
 pretixSCAN
+PromptPay
 Przelewy
 Pseudonymization
 px
@@ -132,12 +143,15 @@ redemptions
 Referer
 renderer
 renderers
+retransmission
+Retransmit
 Revolut
 Sa
 Samplecity
 SAQ
 SCA
 selectable
+SdI
 SEPA
 silvicultural
 smtp
@@ -177,6 +191,8 @@ webhooks
 webserver
 Wechat
 WeChat
+Wero
+WERO
 WhatsApp
 whitespace
 xlsx

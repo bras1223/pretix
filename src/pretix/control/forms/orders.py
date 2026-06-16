@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -331,6 +331,10 @@ class OtherOperationsForm(forms.Form):
 
 
 class OrderPositionAddForm(forms.Form):
+    count = forms.IntegerField(
+        label=_('Number of products to add'),
+        initial=1,
+    )
     itemvar = forms.ChoiceField(
         label=_('Product')
     )
@@ -409,7 +413,6 @@ class OrderPositionAddForm(forms.Form):
                         'event': order.event.slug,
                         'organizer': order.event.organizer.slug,
                     }),
-                    'data-placeholder': pgettext_lazy('subevent', 'Date')
                 }
             )
             self.fields['subevent'].widget.choices = self.fields['subevent'].choices
@@ -433,6 +436,10 @@ class OrderPositionAddForm(forms.Form):
             d['used_membership'] = [m for m in self.memberships if str(m.pk) == d['used_membership']][0]
         else:
             d['used_membership'] = None
+        if d.get("count", 1) > 1 and d.get("seat"):
+            raise ValidationError({
+                "seat": _("You can not choose a seat when adding multiple products at once.")
+            })
         return d
 
 
@@ -705,7 +712,6 @@ class OrderContactForm(forms.ModelForm):
                     'data-select2-url': reverse('control:organizer.customers.select2', kwargs={
                         'organizer': self.instance.event.organizer.slug,
                     }),
-                    'data-placeholder': _('Customer')
                 }
             )
             self.fields['customer'].widget.choices = self.fields['customer'].choices
@@ -976,7 +982,7 @@ class EventCancelForm(FormPlaceholderMixin, forms.Form):
         self._set_field_placeholders('send_subject', ['event_or_subevent', 'refund_amount', 'position_or_address',
                                                       'order', 'event'])
         self._set_field_placeholders('send_message', ['event_or_subevent', 'refund_amount', 'position_or_address',
-                                                      'order', 'event'])
+                                                      'order', 'event'], rich=True)
         self.fields['send_waitinglist_subject'] = I18nFormField(
             label=_("Subject"),
             required=True,
@@ -1000,7 +1006,7 @@ class EventCancelForm(FormPlaceholderMixin, forms.Form):
             ))
         )
         self._set_field_placeholders('send_waitinglist_subject', ['event_or_subevent', 'event'])
-        self._set_field_placeholders('send_waitinglist_message', ['event_or_subevent', 'event'])
+        self._set_field_placeholders('send_waitinglist_message', ['event_or_subevent', 'event'], rich=True)
 
         if self.event.has_subevents:
             self.fields['subevent'].queryset = self.event.subevents.all()
@@ -1032,3 +1038,27 @@ class EventCancelForm(FormPlaceholderMixin, forms.Form):
         if self.event.has_subevents and not d['subevent'] and not d['all_subevents'] and not d.get('subevents_from'):
             raise ValidationError(_('Please confirm that you want to cancel ALL dates in this event series.'))
         return d
+
+
+class EventCancelConfirmForm(forms.Form):
+    confirm = forms.BooleanField(
+        label=_("I understand that this is not reversible and want to continue"),
+        required=True,
+    )
+    confirmation_code = forms.CharField(
+        label=_("Confirmation code"),
+        help_text=_("We have just emailed you a confirmation code to enter to confirm this action"),
+        required=True,
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.code = kwargs.pop("confirmation_code")
+        super().__init__(*args, **kwargs)
+        if not self.code:
+            del self.fields["confirmation_code"]
+
+    def clean_confirmation_code(self):
+        val = self.cleaned_data['confirmation_code']
+        if val != self.code:
+            raise ValidationError(_('The confirmation code is incorrect.'))
+        return val

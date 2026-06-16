@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -27,7 +27,7 @@ from django.core.cache import cache
 from django.test import override_settings
 from django.utils import translation
 from django_scopes import scopes_disabled
-from fakeredis import FakeConnection
+from fakeredis import FakeRedisConnection
 from xdist.dsession import DSession
 
 from pretix.testutils.mock import get_redis_connection
@@ -97,21 +97,21 @@ def fakeredis_client(monkeypatch):
                 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
                 'LOCATION': f'redis://127.0.0.1:{redis_port}',
                 'OPTIONS': {
-                    'connection_class': FakeConnection
+                    'connection_class': FakeRedisConnection
                 }
             },
             'redis_session': {
                 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
                 'LOCATION': f'redis://127.0.0.1:{redis_port}',
                 'OPTIONS': {
-                    'connection_class': FakeConnection
+                    'connection_class': FakeRedisConnection
                 }
             },
             'default': {
                 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
                 'LOCATION': f'redis://127.0.0.1:{redis_port}',
                 'OPTIONS': {
-                    'connection_class': FakeConnection
+                    'connection_class': FakeRedisConnection
                 }
             },
         }
@@ -131,3 +131,8 @@ def set_lock_namespaces(request):
             yield
     else:
         yield
+
+
+@pytest.fixture
+def class_monkeypatch(request, monkeypatch):
+    request.cls.monkeypatch = monkeypatch

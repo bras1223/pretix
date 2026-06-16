@@ -1,8 +1,8 @@
 #
 # This file is part of pretix (Community Edition).
 #
-# Copyright (C) 2014-2020 Raphael Michel and contributors
-# Copyright (C) 2020-2021 rami.io GmbH and contributors
+# Copyright (C) 2014-2020  Raphael Michel and contributors
+# Copyright (C) 2020-today pretix GmbH and contributors
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
 # Public License as published by the Free Software Foundation in version 3 of the License.
@@ -62,8 +62,8 @@ with scopes_disabled():
 class ReusableMediaViewSet(viewsets.ModelViewSet):
     serializer_class = ReusableMediaSerializer
     queryset = ReusableMedium.objects.none()
-    permission = 'can_manage_reusable_media'
-    write_permission = 'can_manage_reusable_media'
+    permission = 'organizer.reusablemedia:read'
+    write_permission = 'organizer.reusablemedia:write'
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     ordering = ('-updated', '-id')
     ordering_fields = ('created', 'updated', 'identifier', 'type', 'id')
@@ -95,6 +95,8 @@ class ReusableMediaViewSet(viewsets.ModelViewSet):
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
         ctx['organizer'] = self.request.organizer
+        ctx['can_read_giftcards'] = 'organizer.giftcards:read' in self.request.orgapermset
+        ctx['can_read_customers'] = 'organizer.customers:read' in self.request.orgapermset
         return ctx
 
     @transaction.atomic()
