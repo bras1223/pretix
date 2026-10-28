@@ -141,7 +141,7 @@ build-backend = "backend"
 backend-path = ["_build"]
 requires = [
   "setuptools",
-  "importlib_metadata",
+  "importlib_metadata==9.*",  # must match project.dependencies; unpinned pulls 10.x and breaks pip 26+
   "tomli",
 ]
 
