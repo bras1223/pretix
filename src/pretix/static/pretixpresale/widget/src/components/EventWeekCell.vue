@@ -47,6 +47,7 @@ function selectDay () {
 
 	if (props.day.events.length === 1) {
 		const ev = props.day.events[0]
+		if (ev.clickable === false) return
 		// TODO store mutation bad
 		store.parentStack.push(store.targetUrl)
 		store.targetUrl = ev.event_url

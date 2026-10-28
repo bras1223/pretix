@@ -3,7 +3,9 @@
 		"src/pretix/static/**/*",
 		"src/pretix/static/**/*.vue",
 		"src/pretix/plugins/webcheckin/**/*",
-		"src/pretix/plugins/webcheckin/**/*.vue"
+		"src/pretix/plugins/webcheckin/**/*.vue",
+		"src/pretix/plugins/wwpcheckin/**/*",
+		"src/pretix/plugins/wwpcheckin/**/*.vue"
 	],
 	"compilerOptions": {
 		"baseUrl": ".",

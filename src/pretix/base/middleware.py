@@ -413,9 +413,11 @@ class SecurityMiddleware(MiddlewareMixin):
             h['font-src'] += list(self._get_font_origins(request.event))
 
         if settings.VITE_DEV_MODE:
-            h['script-src'] += ["http://localhost:5173", "ws://localhost:5173"]
+            vite = settings.VITE_DEV_SERVER
+            vite_ws = vite.replace('http://', 'ws://').replace('https://', 'wss://')
+            h['script-src'] += [vite, vite_ws]
             h['style-src'] += ["'unsafe-inline'"]
-            h['connect-src'] += ["http://localhost:5173", "ws://localhost:5173"]
+            h['connect-src'] += [vite, vite_ws]
 
         # Only include pay.google.com for wallet detection purposes on the Payment selection page
         if (

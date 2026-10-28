@@ -551,6 +551,10 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
     flex-wrap: wrap;
     color: $text-color;
 
+    &.pretix-widget-event-not-clickable {
+      cursor: default;
+    }
+
     &:has(.pretix-widget-event-list-entry-availability) {
       text-decoration: none;
     }
@@ -691,6 +695,10 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
       padding-left: 17px;
       cursor: pointer;
       margin-bottom: 5px;
+
+      &.pretix-widget-event-not-clickable {
+        cursor: default;
+      }
 
       &:before {
         content: "";

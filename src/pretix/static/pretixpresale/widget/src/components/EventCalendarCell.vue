@@ -56,6 +56,7 @@ function selectDay (e: Event) {
 	// TODO decopypasta
 	if (props.day.events.length === 1) {
 		const ev = props.day.events[0]
+		if (ev.clickable === false) return
 		store.parentStack.push(store.targetUrl)
 		store.targetUrl = ev.event_url
 		store.error = null

@@ -43,6 +43,7 @@ export default defineConfig({
 			input: {
 				'webcheckin/main': path.resolve(__dirname, 'src/pretix/plugins/webcheckin/static/pretixplugins/webcheckin/main.ts'),
 				'webcheckinbrand/main': path.resolve(__dirname, 'src/pretix/plugins/webcheckinbrand/static/pretixplugins/webcheckinbrand/main.ts'),
+				'wwpcheckin/main': path.resolve(__dirname, 'src/pretix/plugins/wwpcheckin/static/pretixplugins/wwpcheckin/main.ts'),
 				'checkinrules/main': path.resolve(__dirname, 'src/pretix/static/pretixcontrol/js/ui/checkinrules/index.ts'),
 				...Object.fromEntries(SHARED_DEPS.map(dep => [`_vendor/${dep}`, `virtual:vendor/${dep}`])),
 				...pretixPluginEntries,

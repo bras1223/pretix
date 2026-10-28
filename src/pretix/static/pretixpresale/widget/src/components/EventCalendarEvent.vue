@@ -10,9 +10,12 @@ const props = defineProps<{
 
 const store = inject(StoreKey)!
 
+const isClickable = computed(() => props.event.clickable !== false)
+
 const classObject = computed(() => {
 	const o: Record<string, boolean> = {
 		'pretix-widget-event-calendar-event': true,
+		'pretix-widget-event-not-clickable': !isClickable.value,
 	}
 	o[`pretix-widget-event-availability-${props.event.availability.color}`] = true
 	if (props.event.availability.reason) {
@@ -22,6 +25,7 @@ const classObject = computed(() => {
 })
 
 function select () {
+	if (!isClickable.value) return
 	store.parentStack.push(store.targetUrl)
 	store.targetUrl = props.event.event_url
 	store.error = null
@@ -31,10 +35,12 @@ function select () {
 }
 </script>
 <template lang="pug">
-a.pretix-widget-event-calendar-event(
-	href="#",
+component(
+	:is="isClickable ? 'a' : 'span'",
+	:href="isClickable ? '#' : undefined",
 	:class="classObject",
 	:aria-describedby="describedby",
+	:aria-disabled="!isClickable ? 'true' : undefined",
 	@click.prevent.stop="select"
 )
 	strong.pretix-widget-event-calendar-event-name {{ event.name }}

@@ -30,6 +30,7 @@ export function createWidgetInstance (element: Element, htmlId?: string): App {
 		skipSsl: 'skip-ssl-check' in element.attributes,
 		disableIframe: 'disable-iframe' in element.attributes,
 		disableVouchers: 'disable-vouchers' in element.attributes,
+		requireVoucher: 'require-voucher' in element.attributes,
 		disableFilters: 'disable-filters' in element.attributes,
 		displayEventInfo,
 		filter: element.attributes.filter?.value || null,

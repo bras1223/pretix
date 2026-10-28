@@ -265,7 +265,7 @@ def widget_js(request, version, lang, **kwargs):
 
     data = get_widget_js(version, lang)
 
-    resp = HttpResponse(data, content_type='text/javascript')
+    resp = HttpResponse(data, content_type='text/javascript; charset=utf-8')
     resp['Access-Control-Allow-Origin'] = '*'
     return resp
 
@@ -450,7 +450,7 @@ class WidgetAPIProductList(EventListMixin, View):
         else:
             return self.get(request, **kwargs)
 
-    def _get_availability(self, ev, event, tz=None):
+    def _get_availability(self, ev, event, tz=None, display_only=False):
         availability = {}
         if ev.presale_is_running and event.settings.event_list_availability:
             if ev.best_availability_state == Quota.AVAILABILITY_OK:
@@ -460,7 +460,9 @@ class WidgetAPIProductList(EventListMixin, View):
                     availability['reason'] = 'low'
                 else:
                     availability['color'] = 'green'
-                    if ev.has_paid_item:
+                    if display_only:
+                        availability['text'] = gettext('Available')
+                    elif ev.has_paid_item:
                         availability['text'] = pgettext('available_event_in_list', 'Buy now')
                     else:
                         availability['text'] = gettext('Book now')
@@ -486,7 +488,7 @@ class WidgetAPIProductList(EventListMixin, View):
                 availability['reason'] = 'unknown'
         elif ev.presale_is_running:
             availability['color'] = 'green'
-            availability['text'] = gettext('Book now')
+            availability['text'] = gettext('Available') if display_only else gettext('Book now')
             availability['reason'] = 'ok'
         elif ev.presale_has_ended:
             availability['color'] = 'red'
@@ -514,7 +516,7 @@ class WidgetAPIProductList(EventListMixin, View):
                 dr += " – " + date_format(ev.date_to.astimezone(tz), "TIME_FORMAT")
         return dr
 
-    def _serialize_events(self, ebd):
+    def _serialize_events(self, ebd, display_only=False):
         events = []
         for e in ebd:
             ev = e['event']
@@ -533,11 +535,21 @@ class WidgetAPIProductList(EventListMixin, View):
                 'location': str(ev.location),
                 'crowd': str(ev.crowd),
                 'date_range': self._get_date_range(ev, event, tz=tz),
-                'availability': self._get_availability(ev, event, tz=tz),
+                'availability': self._get_availability(ev, event, tz=tz, display_only=display_only),
                 'event_url': eventreverse_absolute(event, 'presale:event.index'),
                 'subevent': ev.pk if isinstance(ev, SubEvent) else None,
+                'clickable': not display_only,
             })
         return events
+
+    def _resolve_list_voucher(self, request):
+        """Resolve voucher from GET for calendar/list filtering (same idea as shop)."""
+        if not hasattr(request, 'event') or not request.GET.get('voucher'):
+            return None
+        try:
+            return request.event.vouchers.get(code__iexact=request.GET.get('voucher').strip())
+        except Voucher.DoesNotExist:
+            return None
 
     def _get_event_list(self, request, **kwargs):
         data = {}
@@ -547,6 +559,7 @@ class WidgetAPIProductList(EventListMixin, View):
         data['meta_filter_fields'] = [
             {**v, "key": k} for k, v in meta_filtersets(request.organizer, getattr(request, 'event', None)).items()
         ]
+        voucher = self._resolve_list_voucher(request)
 
         if hasattr(self.request, 'event') and data['list_type'] not in ("calendar", "week"):
             # only allow list-view of more than 50 subevents if ordering is by date as this can be done in the database
@@ -591,7 +604,7 @@ class WidgetAPIProductList(EventListMixin, View):
             if hasattr(self.request, 'event'):
                 add_subevents_for_days(
                     filter_qs_by_attr(
-                        self.request.event.subevents_annotated(self.request.sales_channel).filter(
+                        self.request.event.subevents_annotated(self.request.sales_channel, voucher).filter(
                             Q(event__all_sales_channels=True) |
                             Q(event__limit_sales_channels=self.request.sales_channel),
                         ), self.request
@@ -599,6 +612,7 @@ class WidgetAPIProductList(EventListMixin, View):
                     before=limit_before, after=after, ebd=ebd, timezones=set(), event=self.request.event,
                     cart_namespace=kwargs.get('cart_namespace'),
                     sales_channel=self.request.sales_channel,
+                    voucher=voucher,
                 )
                 if not any(ebd):
                     data['empty_text'] = str(rich_text(request.event.settings.event_list_empty_text, safelinks=False))
@@ -633,11 +647,12 @@ class WidgetAPIProductList(EventListMixin, View):
                     sales_channel=self.request.sales_channel,
                 )
             data['weeks'] = weeks_for_template(ebd, self.year, self.month)
+            display_only = bool(voucher and voucher.display_only)
             for w in data['weeks']:
                 for d in w:
                     if not d:
                         continue
-                    d['events'] = self._serialize_events(d['events'] or [])
+                    d['events'] = self._serialize_events(d['events'] or [], display_only=display_only)
         elif list_type == "week":
             self._set_week_year()
 
@@ -663,10 +678,14 @@ class WidgetAPIProductList(EventListMixin, View):
             ebd = defaultdict(list)
             if hasattr(self.request, 'event'):
                 add_subevents_for_days(
-                    filter_qs_by_attr(self.request.event.subevents_annotated(self.request.sales_channel), self.request),
+                    filter_qs_by_attr(
+                        self.request.event.subevents_annotated(self.request.sales_channel, voucher),
+                        self.request
+                    ),
                     before=limit_before, after=after, ebd=ebd, timezones=set(), event=self.request.event,
                     cart_namespace=kwargs.get('cart_namespace'),
                     sales_channel=self.request.sales_channel,
+                    voucher=voucher,
                 )
                 if not any(ebd):
                     data['empty_text'] = str(rich_text(request.event.settings.event_list_empty_text, safelinks=False))
@@ -693,8 +712,9 @@ class WidgetAPIProductList(EventListMixin, View):
                 )
 
             data['days'] = days_for_template(ebd, week)
+            display_only = bool(voucher and voucher.display_only)
             for d in data['days']:
-                d['events'] = self._serialize_events(d['events'] or [])
+                d['events'] = self._serialize_events(d['events'] or [], display_only=display_only)
         else:
             try:
                 offset = int(self.request.GET.get("offset", 0))
@@ -703,7 +723,7 @@ class WidgetAPIProductList(EventListMixin, View):
             limit = 50
             if hasattr(self.request, 'event'):
                 evs = filter_qs_by_attr(
-                    self.request.event.subevents_annotated(self.request.sales_channel),
+                    self.request.event.subevents_annotated(self.request.sales_channel, voucher),
                     self.request,
                     match_subevents_with_conditions=(
                         Q(Q(date_to__isnull=True) & Q(date_from__gte=now() - timedelta(hours=24)))
@@ -723,17 +743,20 @@ class WidgetAPIProductList(EventListMixin, View):
                 tz = request.event.timezone
                 evs = [
                     se for se in evs
-                    if not should_hide_subevent(self.request.event.settings, se)
+                    if not should_hide_subevent(self.request.event.settings, se, voucher)
+                    and not (voucher and se.best_availability_state is None)
                 ]
 
+                display_only = bool(voucher and voucher.display_only)
                 data['events'] = [
                     {
                         'name': str(ev.name),
                         'location': str(ev.location),
                         'date_range': self._get_date_range(ev, ev.event, tz),
-                        'availability': self._get_availability(ev, ev.event, tz=tz),
+                        'availability': self._get_availability(ev, ev.event, tz=tz, display_only=display_only),
                         'event_url': eventreverse_absolute(ev.event, 'presale:event.index'),
                         'subevent': ev.pk,
+                        'clickable': not display_only,
                     } for ev in evs
                 ]
                 if not data['events']:
@@ -759,6 +782,13 @@ class WidgetAPIProductList(EventListMixin, View):
                         'availability': avail,
                         'event_url': eventreverse_absolute(event, 'presale:event.index'),
                     })
+
+        if hasattr(self.request, 'event'):
+            vouchers_exist = self.request.event.get_cache().get('vouchers_exist')
+            if vouchers_exist is None:
+                vouchers_exist = self.request.event.vouchers.exists()
+                self.request.event.get_cache().set('vouchers_exist', vouchers_exist)
+            data['vouchers_exist'] = vouchers_exist
 
         cache.set(cache_key, data, 30)
         # These pages are cached for a really short duration – this should make them pretty accurate, while still
@@ -842,6 +872,9 @@ class WidgetAPIProductList(EventListMixin, View):
         if 'voucher' in request.GET:
             try:
                 self.voucher = request.event.vouchers.get(code__iexact=request.GET.get('voucher').strip())
+                if self.voucher.display_only:
+                    data['error'] = error_messages['voucher_display_only']
+                    fail = True
                 if self.voucher.redeemed >= self.voucher.max_usages:
                     data['error'] = error_messages['voucher_redeemed']
                     fail = True

@@ -40,7 +40,7 @@
                             </p>
                             <ul class="events">
                                 {% for event in day.events %}
-                                    <li><a class="event {% if event.continued %}continued{% endif %} {% spaceless %}
+                                    <li>{% if event.display_only %}<span{% else %}<a href="{{ event.url }}"{% endif %} class="event {% if event.continued %}continued{% endif %} {% spaceless %}
     {% if event.event.presale_is_running and show_avail %}
         {% if event.event.best_availability_state == 100 %}
             available {% if event.event.best_availability_is_low %} low {% endif %}
@@ -60,8 +60,7 @@
     {% else %}
         soon
     {% endif %}
-{% endspaceless %}"
-                                       href="{{ event.url }}">
+{% endspaceless %}">
                                         {% if show_names|default_if_none:True %}
                                             <span class="event-name">
                                                 {{ event.event.name }}
@@ -92,7 +91,9 @@
                                                         {% if event.event.best_availability_is_low %}
                                                             <span class="fa fa-exclamation-circle" aria-hidden="true"></span> {% trans "Few tickets left" %}
                                                         {% else %}
-                                                            {% if event.event.has_paid_item %}
+                                                            {% if event.display_only %}
+                                                                <span class="fa fa-ticket" aria-hidden="true"></span> {% trans "Available" %}
+                                                            {% elif event.event.has_paid_item %}
                                                                 <span class="fa fa-ticket" aria-hidden="true"></span> {% trans "Buy now" context "available_event_in_list" %}
                                                             {% else %}
                                                                 <span class="fa fa-ticket" aria-hidden="true"></span> {% trans "Book now" %}
@@ -110,7 +111,7 @@
                                                         {% endif %}
                                                     {% endif %}
                                                 {% elif event.event.presale_is_running %}
-                                                    <span class="fa fa-ticket" aria-hidden="true"></span> {% trans "Book now" %}
+                                                    <span class="fa fa-ticket" aria-hidden="true"></span> {% if event.display_only %}{% trans "Available" %}{% else %}{% trans "Book now" %}{% endif %}
                                                 {% elif event.event.presale_has_ended %}
                                                     {% trans "Sale over" %}
                                                 {% elif event.event.settings.presale_start_show_date and event.event.effective_presale_start %}
@@ -124,7 +125,7 @@
                                                 {% endif %}
                                             </span>
                                         {% endif %}
-                                    </a></li>
+                                    {% if event.display_only %}</span>{% else %}</a>{% endif %}</li>
                                 {% endfor %}
                             </ul>
                         </td>

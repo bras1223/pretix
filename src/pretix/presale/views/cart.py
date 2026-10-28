@@ -748,6 +748,14 @@ class RedeemView(NoSearchIndexViewMixin, EventViewMixin, CartMixin, TemplateView
             v = v.strip()
             try:
                 self.voucher = Voucher.objects.get(code__iexact=v, event=request.event)
+                if self.voucher.display_only:
+                    # Unlock calendar visibility only; never open the purchase/redeem flow.
+                    return redirect_to_url(
+                        eventreverse(
+                            self.request.event, 'presale:event.index',
+                            kwargs={'cart_namespace': kwargs.get('cart_namespace') or ''}
+                        ) + '?voucher=' + quote(self.voucher.code)
+                    )
                 if self.voucher.redeemed >= self.voucher.max_usages:
                     if self.request.event.is_voting:
                         err = "Dieëze voucher és al 'ne kieër gebroêktj..."

@@ -162,6 +162,9 @@ error_messages = {
     'price_not_a_number': gettext_lazy('The entered price is not a number.'),
     'price_too_high': gettext_lazy('The entered price is to high.'),
     'voucher_invalid': gettext_lazy('This voucher code is not known in our database.'),
+    'voucher_display_only': gettext_lazy(
+        'This voucher can only be used to view availability and cannot be used for purchases.'
+    ),
     'voucher_min_usages': ngettext_lazy(
         'The voucher code "%(voucher)s" can only be used if you select at least %(number)s matching product.',
         'The voucher code "%(voucher)s" can only be used if you select at least %(number)s matching products.',
@@ -735,6 +738,9 @@ class CartManager:
         if not voucher.is_active():
             raise CartError(error_messages['voucher_expired'])
 
+        if voucher.display_only:
+            raise CartError(error_messages['voucher_display_only'])
+
         for p in self.positions:
             if p.voucher_id:
                 continue
@@ -831,6 +837,8 @@ class CartManager:
                 except Voucher.DoesNotExist:
                     raise CartError(error_messages['voucher_invalid'])
                 else:
+                    if voucher.display_only:
+                        raise CartError(error_messages['voucher_display_only'])
                     voucher_use_diff[voucher] += i['count']
 
                     if i.get('voucher_ignore_if_redeemed', False):

@@ -1885,6 +1885,12 @@ class WidgetCodeForm(forms.Form):
                     "bought via the widget, this voucher will be used. This can for example be used to provide "
                     "widgets that give discounts or unlock secret products.")
     )
+    require_voucher = forms.BooleanField(
+        label=_("Require voucher before timeslots"),
+        required=False,
+        help_text=_("If set, the widget only shows a voucher code field at first. Available dates/timeslots are shown "
+                    "in the checkout popup after the voucher has been entered. Useful for voucher-only series events.")
+    )
     compatibility_mode = forms.BooleanField(
         label=_("Compatibility mode"),
         required=False,

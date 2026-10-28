@@ -6,6 +6,7 @@ import EventForm from './EventForm.vue'
 import EventList from './EventList.vue'
 import EventCalendar from './EventCalendar.vue'
 import EventWeekCalendar from './EventWeekCalendar.vue'
+import VoucherForm from './VoucherForm.vue'
 import Overlay from './Overlay.vue'
 
 const emit = defineEmits<{
@@ -23,6 +24,13 @@ const classObject = computed(() => ({
 	'pretix-widget-mobile': mobile.value,
 	'pretix-widget-use-custom-spinners': true,
 }))
+
+// With require-voucher: always show voucher input first; calendar/list only after redeem (popup).
+const showVoucherGate = computed(() =>
+	store.requireVoucher
+	&& !store.disableVouchers
+	&& !store.voucherCode
+)
 
 watch(mobile, (newValue) => {
 	store.mobile = newValue
@@ -62,10 +70,11 @@ watch(() => store.view, (_newValue, oldValue) => {
 		.pretix-widget-error-action(v-if="store.error && store.connectionError")
 			a.pretix-widget-button(:href="store.newTabTarget", target="_blank") {{ STRINGS.open_new_tab }}
 
-		EventForm(v-if="store.view === 'event'", ref="formcomp")
-		EventList(v-if="store.view === 'events'")
-		EventCalendar(v-if="store.view === 'weeks'", :mobile="mobile")
-		EventWeekCalendar(v-if="store.view === 'days'", :mobile="mobile")
+		VoucherForm(v-if="showVoucherGate")
+		EventForm(v-else-if="store.view === 'event'", ref="formcomp")
+		EventList(v-else-if="store.view === 'events'")
+		EventCalendar(v-else-if="store.view === 'weeks'", :mobile="mobile")
+		EventWeekCalendar(v-else-if="store.view === 'days'", :mobile="mobile")
 
 		.pretix-widget-clear
 		.pretix-widget-attribution(v-if="store.poweredby", v-html="store.poweredby")

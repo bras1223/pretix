@@ -476,11 +476,11 @@ def _redeem_process(*, checkinlists, raw_barcode, answers_data, datetime, force,
     if not checkinlists:
         raise ValidationError('No check-in list passed.')
 
-    if hasattr(user, 'checkinlist_id'):
-            user_checkinlist_id = int(user.checkinlist_id)
-            checkinlist_ids = [cl.pk for cl in checkinlists]
-            if user_checkinlist_id not in checkinlist_ids:
-                raise ValidationError('User does not have permission for the provided check-in list.')
+    if getattr(user, 'checkinlist_id', None) not in (None, ''):
+        user_checkinlist_id = int(user.checkinlist_id)
+        checkinlist_ids = [cl.pk for cl in checkinlists]
+        if user_checkinlist_id not in checkinlist_ids:
+            raise ValidationError('User does not have permission for the provided check-in list.')
 
     list_by_event = {cl.event_id: cl for cl in checkinlists}
     prefetch_related_objects([cl for cl in checkinlists if not cl.all_products], 'limit_products')

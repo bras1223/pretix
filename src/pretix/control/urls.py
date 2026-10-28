@@ -71,6 +71,7 @@ urlpatterns = [
     re_path(r'^sudo/sessions/$', user.StaffSessionList.as_view(), name='user.sudo.list'),
     re_path(r'^users/$', users.UserListView.as_view(), name='users'),
     re_path(r'^users/select2$', typeahead.users_select2, name='users.select2'),
+    re_path(r'^users/checkinlists$', users.checkinlists_for_event, name='users.checkinlists'),
     re_path(r'^users/add$', users.UserCreateView.as_view(), name='users.add'),
     re_path(r'^users/impersonate/stop', users.UserImpersonateStopView.as_view(), name='users.impersonate.stop'),
     re_path(r'^users/(?P<id>\d+)/$', users.UserEditView.as_view(), name='users.edit'),

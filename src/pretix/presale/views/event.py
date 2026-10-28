@@ -445,8 +445,9 @@ class EventIndex(EventViewMixin, EventListMixin, CartMixin, TemplateView):
             context['subevent_list'] = [
                 se for se in subevents
                 if not should_hide_subevent(self.request.event.settings, se, voucher)
+                and not (voucher and se.best_availability_state is None)
             ]
-            context['visible_events'] = len(subevents) > 0
+            context['visible_events'] = len(context['subevent_list']) > 0
         return context
 
 

@@ -375,7 +375,13 @@ class EventMixin:
             elif voucher.quota_id:
                 q_variation &= Q(quotas__in=[voucher.quota_id])
 
-        if not voucher or not voucher.show_hidden_items:
+        # Match filter_available(): product-specific vouchers unlock hide_without_voucher items.
+        if not voucher or (
+            not voucher.show_hidden_items
+            and not voucher.item_id
+            and not voucher.variation_id
+            and not voucher.quota_id
+        ):
             q_variation &= Q(hide_without_voucher=False)
             q_variation &= Q(item__hide_without_voucher=False)
 

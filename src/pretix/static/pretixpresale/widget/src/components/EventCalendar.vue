@@ -68,7 +68,7 @@ function nextmonth () {
 	//- Back navigation
 	.pretix-widget-back(v-if="store.events !== null")
 		a(href="#", role="button", @click.prevent.stop="backToList")
-			| &lsaquo; {{ STRINGS.back }}
+			| {{ '\u2039' }} {{ STRINGS.back }}
 
 	//- Headline
 	.pretix-widget-event-header(v-if="displayEventInfo")

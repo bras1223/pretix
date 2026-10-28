@@ -909,9 +909,10 @@ FILE_UPLOAD_MAX_SIZE_OTHER = 1024 * 1024 * config.getint("pretix_file_upload", "
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-VITE_DEV_SERVER_PORT = 5173
+VITE_DEV_SERVER_PORT = int(os.environ.get('VITE_DEV_SERVER_PORT', '5173'))
 VITE_DEV_SERVER = f"http://localhost:{VITE_DEV_SERVER_PORT}"
-VITE_DEV_MODE = DEBUG
+# Use built assets by default when VITE_DEV=0 (avoids stale Vite HMR). Set VITE_DEV=1 for HMR.
+VITE_DEV_MODE = DEBUG and os.environ.get('VITE_DEV', '0') not in ('', '0', 'false', 'False')
 VITE_IGNORE = False  # Used to ignore `collectstatic`/`rebuild`
 
 if DEBUG:

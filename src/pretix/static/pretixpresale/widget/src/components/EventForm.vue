@@ -3,16 +3,14 @@ import { computed, inject, ref, watch, onMounted, onBeforeUnmount, nextTick } fr
 import { StoreKey } from '~/sharedStore'
 import { STRINGS } from '~/i18n'
 import Category from './Category.vue'
+import VoucherForm from './VoucherForm.vue'
 
 const store = inject(StoreKey)!
 
 const form = ref<HTMLFormElement>()
-const voucherinput = ref<HTMLInputElement>()
+const voucherForm = ref<InstanceType<typeof VoucherForm>>()
 const isItemsSelected = ref(false)
-const localVoucher = ref('')
 
-const idVoucherInput = computed(() => `${store.htmlId}-voucher-input`)
-const ariaLabelledby = computed(() => `${store.htmlId}-voucher-headline`)
 const displayEventInfo = computed(() => store.displayEventInfo || (store.displayEventInfo === null && (store.events || store.weeks || store.days)))
 const idCartExistsMsg = computed(() => `${store.htmlId}-cart-exists`)
 
@@ -34,13 +32,6 @@ const buyLabel = computed(() => {
 		if (!allFree) break
 	}
 	return allFree ? STRINGS.register : STRINGS.buy
-})
-
-const hiddenParams = computed(() => {
-	const params = new URL(store.getVoucherFormTarget()).searchParams
-	params.delete('iframe')
-	params.delete('take_cart_id')
-	return [...params.entries()]
 })
 
 const showVoucherForm = computed(() => store.vouchersExist && !store.disableVouchers && !store.voucherCode)
@@ -81,19 +72,11 @@ function calcItemsSelected () {
 	isItemsSelected.value = hasChecked || hasQuantity
 }
 
-function _focusVoucherField () {
-	voucherinput.value?.focus()
-}
-
 function handleBuy (event: Event) {
 	if (form.value) {
 		const formData = new FormData(form.value)
 		store.buy(formData, event)
 	}
-}
-
-function handleRedeem (event: Event) {
-	store.redeem(localVoucher.value, event)
 }
 
 onMounted(() => {
@@ -121,9 +104,9 @@ watch(() => store.overlay?.frameShown, (newValue) => {
 	//- Back navigation
 	.pretix-widget-event-list-back(v-if="store.events || store.weeks || store.days")
 		a(v-if="!store.subevent", href="#", rel="back", @click.prevent.stop="backToList")
-			| &lsaquo; {{ STRINGS.back_to_list }}
+			| {{ '\u2039' }} {{ STRINGS.back_to_list }}
 		a(v-if="store.subevent", href="#", rel="back", @click.prevent.stop="backToList")
-			| &lsaquo; {{ STRINGS.back_to_dates }}
+			| {{ '\u2039' }} {{ STRINGS.back_to_dates }}
 
 	//- Event name
 	.pretix-widget-event-header(v-if="displayEventInfo")
@@ -199,39 +182,7 @@ watch(() => store.overlay?.frameShown, (newValue) => {
 				@click.prevent.stop="store.resume()"
 			) {{ STRINGS.resume_checkout }}
 
-	//- Voucher form
-	form(
-		v-if="showVoucherForm",
-		method="get",
-		:action="store.getVoucherFormTarget()",
-		target="_blank"
-	)
-		.pretix-widget-voucher
-			h3.pretix-widget-voucher-headline(:id="ariaLabelledby") {{ STRINGS.redeem_voucher }}
-			.pretix-widget-voucher-text(
-				v-if="store.voucherExplanationText",
-				v-html="store.voucherExplanationText"
-			)
-			.pretix-widget-voucher-input-wrap
-				input.pretix-widget-voucher-input(
-					:id="idVoucherInput",
-					ref="voucherinput",
-					v-model="localVoucher",
-					type="text",
-					name="voucher",
-					:placeholder="STRINGS.voucher_code",
-					:aria-labelledby="ariaLabelledby"
-				)
-			input(
-				v-for="p in hiddenParams",
-				:key="p[0]",
-				type="hidden",
-				:name="p[0]",
-				:value="p[1]"
-			)
-			.pretix-widget-voucher-button-wrap
-				button(@click="handleRedeem") {{ STRINGS.redeem }}
-			.pretix-widget-clear
+	VoucherForm(v-if="showVoucherForm", ref="voucherForm")
 </template>
 <style lang="sass">
 </style>

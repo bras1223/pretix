@@ -20,6 +20,7 @@ export function createWidgetStore (config: {
 	skipSsl?: boolean
 	disableIframe?: boolean
 	disableVouchers?: boolean
+	requireVoucher?: boolean
 	disableFilters?: boolean
 	displayEventInfo?: boolean | null
 	filter?: string | null
@@ -45,6 +46,7 @@ export function createWidgetStore (config: {
 			skipSsl: config.skipSsl ?? false,
 			disableIframe: config.disableIframe ?? false,
 			disableVouchers: config.disableVouchers ?? false,
+			requireVoucher: config.requireVoucher ?? false,
 			disableFilters: config.disableFilters ?? false,
 			displayEventInfo: config.displayEventInfo ?? null as boolean | null,
 			filter: config.filter ?? null as string | null,
@@ -261,6 +263,12 @@ export function createWidgetStore (config: {
 					}
 
 					this.connectionError = false
+					if (data.vouchers_exist !== undefined) {
+						this.vouchersExist = !!data.vouchers_exist
+					}
+					if (data.voucher_explanation_text !== undefined) {
+						this.voucherExplanationText = data.voucher_explanation_text ?? null
+					}
 
 					if (data.weeks !== undefined) {
 						this.weeks = data.weeks
@@ -306,13 +314,11 @@ export function createWidgetStore (config: {
 						this.currency = data.currency ?? ''
 						this.currency_places = data.currency_places ?? 2
 						this.displayNetPrices = data.display_net_prices ?? false
-						this.voucherExplanationText = data.voucher_explanation_text ?? null
 						this.error = data.error ?? null
 						this.displayAddToCart = data.display_add_to_cart ?? false
 						this.waitingListEnabled = data.waiting_list_enabled ?? false
 						this.showVariationsExpanded = data.show_variations_expanded || !!this.variationFilter
 						this.cartExists = data.cart_exists ?? false
-						this.vouchersExist = data.vouchers_exist ?? false
 						this.hasSeatingPlan = data.has_seating_plan ?? false
 						this.hasSeatingPlanWaitinglist = data.has_seating_plan_waitinglist ?? false
 						this.itemnum = data.itemnum ?? 0

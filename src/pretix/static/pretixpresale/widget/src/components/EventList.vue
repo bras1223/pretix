@@ -44,7 +44,7 @@ console.log(store)
 .pretix-widget-event-list
 	.pretix-widget-back(v-if="store.weeks || store.parentStack.length > 0")
 		a(href="#", rel="prev", @click.prevent.stop="backToCalendar")
-			| &lsaquo; {{ STRINGS.back }}
+			| {{ '\u2039' }} {{ STRINGS.back }}
 
 	.pretix-widget-event-header(v-if="displayEventInfo")
 		strong {{ store.name }}

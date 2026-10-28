@@ -33,6 +33,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.crypto import get_random_string, salted_hmac
@@ -42,13 +43,16 @@ from django.views import View
 from django.views.generic import ListView, TemplateView
 from django_otp import devices_for_user
 from django_otp.plugins.otp_static.models import StaticDevice
+from django_scopes import scopes_disabled
 from hijack import signals
 
 from pretix.base.auth import get_auth_backends
-from pretix.base.models import User
+from pretix.base.models import CheckinList, User
 from pretix.control.forms.filter import UserFilterForm
 from pretix.control.forms.users import UserEditForm
-from pretix.control.permissions import AdministratorPermissionRequiredMixin
+from pretix.control.permissions import (
+    AdministratorPermissionRequiredMixin, administrator_permission_required,
+)
 from pretix.control.views import CreateView, UpdateView
 from pretix.control.views.user import RecentAuthenticationRequiredMixin
 
@@ -70,6 +74,27 @@ def keep_session_age(session):
     else:
         yield
         session["_session_expiry"] = session_expiry
+
+
+@administrator_permission_required()
+def checkinlists_for_event(request):
+    """JSON list of check-in lists for the selected event (user admin form)."""
+    try:
+        event_id = int(request.GET.get('event', '') or 0)
+    except (TypeError, ValueError):
+        event_id = 0
+
+    if not event_id:
+        return JsonResponse({'results': []})
+
+    with scopes_disabled():
+        qs = CheckinList.objects.filter(event_id=event_id).order_by('name')
+        return JsonResponse({
+            'results': [
+                {'id': cl.pk, 'text': cl.name}
+                for cl in qs
+            ]
+        })
 
 
 class UserListView(AdministratorPermissionRequiredMixin, ListView):

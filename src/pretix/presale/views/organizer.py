@@ -63,6 +63,7 @@ from django.views.generic import ListView, TemplateView
 from pretix.base.i18n import language
 from pretix.base.models import (
     Event, EventMetaValue, Organizer, Quota, SubEvent, SubEventMetaValue,
+    Voucher,
 )
 from pretix.base.services.quotas import QuotaAvailability
 from pretix.base.timemachine import time_machine_now
@@ -229,10 +230,36 @@ class EventListMixin:
         ), self.request.sales_channel)
         return qs
 
+    def _get_calendar_voucher(self):
+        if not hasattr(self.request, 'event') or not self.request.GET.get('voucher'):
+            return None
+        try:
+            return self.request.event.vouchers.get(code__iexact=self.request.GET.get('voucher').strip())
+        except Voucher.DoesNotExist:
+            return None
+
+    def _filter_subevents_for_voucher(self, qs, voucher):
+        """Limit subevents to those that can sell the voucher's product (for calendar month/week focus)."""
+        if not voucher:
+            return qs
+        if voucher.subevent_id:
+            return qs.filter(pk=voucher.subevent_id)
+        if voucher.item_id:
+            return qs.filter(quotas__items=voucher.item_id).distinct()
+        if voucher.variation_id:
+            return qs.filter(quotas__variations=voucher.variation_id).distinct()
+        if voucher.quota_id:
+            return qs.filter(quotas=voucher.quota_id)
+        if voucher.show_hidden_items:
+            qs_hidden = qs.filter(quotas__items__hide_without_voucher=True).distinct()
+            if qs_hidden.exists():
+                return qs_hidden
+        return qs
+
     def _set_month_to_next_subevent(self):
         tz = self.request.event.timezone
         now_dt = time_machine_now()
-        next_sev = self.request.event.subevents.using(settings.DATABASE_REPLICA).annotate(
+        qs = self.request.event.subevents.using(settings.DATABASE_REPLICA).annotate(
             effective_date=Case(
                 When(date_from__lt=now_dt, date_to__isnull=False, date_to__gte=now_dt, then=Value(now_dt)),
                 default=F('date_from'),
@@ -241,7 +268,9 @@ class EventListMixin:
             effective_date__gte=now_dt,
             active=True,
             is_public=True,
-        ).select_related('event').order_by('effective_date').first()
+        )
+        qs = self._filter_subevents_for_voucher(qs, self._get_calendar_voucher())
+        next_sev = qs.select_related('event').order_by('effective_date').first()
 
         if next_sev:
             datetime_from = next_sev.effective_date
@@ -311,7 +340,7 @@ class EventListMixin:
     def _set_week_to_next_subevent(self):
         now_dt = time_machine_now()
         tz = self.request.event.timezone
-        next_sev = self.request.event.subevents.using(settings.DATABASE_REPLICA).annotate(
+        qs = self.request.event.subevents.using(settings.DATABASE_REPLICA).annotate(
             effective_date=Case(
                 When(date_from__lt=now_dt, date_to__isnull=False, date_to__gte=now_dt, then=Value(now_dt)),
                 default=F('date_from'),
@@ -320,7 +349,9 @@ class EventListMixin:
             effective_date__gte=now_dt,
             active=True,
             is_public=True,
-        ).select_related('event').order_by('effective_date').first()
+        )
+        qs = self._filter_subevents_for_voucher(qs, self._get_calendar_voucher())
+        next_sev = qs.select_related('event').order_by('effective_date').first()
 
         if next_sev:
             datetime_from = next_sev.effective_date
@@ -635,6 +666,8 @@ def add_subevents_for_days(qs, before, after, ebd, timezones, sales_channel, eve
     ).order_by(
         'date_from'
     )
+    if voucher and voucher.subevent_id:
+        qs = qs.filter(pk=voucher.subevent_id)
     subevents = filter_subevents_with_plugins(list(qs), sales_channel)
 
     quotas_to_compute = []
@@ -668,6 +701,9 @@ def add_subevents_for_days(qs, before, after, ebd, timezones, sales_channel, eve
         s = event.settings if event else se.event.settings
         if should_hide_subevent(s, se, voucher):
             continue
+        # With a voucher, always hide dates with no matching products (keep sold-out as red).
+        if voucher and se.best_availability_state is None:
+            continue
 
         timezones.add(s.timezone)
         tz = ZoneInfo(s.timezone)
@@ -696,11 +732,16 @@ def add_subevents_for_days(qs, before, after, ebd, timezones, sales_channel, eve
                         else None
                     ),
                     'event': se,
+                    'display_only': bool(voucher and voucher.display_only),
                     'url': (
-                        eventreverse(se.event, 'presale:event.redeem',
-                                     kwargs={k: v for k, v in kwargs.items() if k != 'subevent'}) + f'?subevent={se.pk}&voucher={quote(voucher.code)}'
-                        if voucher
-                        else eventreverse(se.event, 'presale:event.index', kwargs=kwargs)
+                        ''
+                        if voucher and voucher.display_only
+                        else (
+                            eventreverse(se.event, 'presale:event.redeem',
+                                         kwargs={k: v for k, v in kwargs.items() if k != 'subevent'}) + f'?subevent={se.pk}&voucher={quote(voucher.code)}'
+                            if voucher
+                            else eventreverse(se.event, 'presale:event.index', kwargs=kwargs)
+                        )
                     )
                 })
                 d += timedelta(days=1)
@@ -710,11 +751,16 @@ def add_subevents_for_days(qs, before, after, ebd, timezones, sales_channel, eve
                 'event': se,
                 'continued': False,
                 'time': datetime_from.time().replace(tzinfo=None) if s.show_times else None,
+                'display_only': bool(voucher and voucher.display_only),
                 'url': (
-                    eventreverse(se.event, 'presale:event.redeem',
-                                 kwargs={k: v for k, v in kwargs.items() if k != 'subevent'}) + f'?subevent={se.pk}&voucher={quote(voucher.code)}'
-                    if voucher
-                    else eventreverse(se.event, 'presale:event.index', kwargs=kwargs)
+                    ''
+                    if voucher and voucher.display_only
+                    else (
+                        eventreverse(se.event, 'presale:event.redeem',
+                                     kwargs={k: v for k, v in kwargs.items() if k != 'subevent'}) + f'?subevent={se.pk}&voucher={quote(voucher.code)}'
+                        if voucher
+                        else eventreverse(se.event, 'presale:event.index', kwargs=kwargs)
+                    )
                 ),
                 'timezone': s.timezone,
             })

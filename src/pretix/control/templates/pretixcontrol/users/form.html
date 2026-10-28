@@ -2,7 +2,11 @@
 {% load i18n %}
 {% load bootstrap3 %}
 {% load icon %}
+{% load static %}
 {% block title %}{% trans "User" %}{% endblock %}
+{% block custom_header %}
+    <script type="text/javascript" src="{% static "pretixcontrol/js/ui/user_checkin.js" %}"></script>
+{% endblock %}
 {% block content %}
     <h1>{% trans "User" %} {{ user.email }}</h1>
     <p>
@@ -55,7 +59,8 @@
                     {% endif %}
                     {% bootstrap_field form.email layout='control' %}
                     {% bootstrap_field form.auth_token layout='control' %}
-                    {% bootstrap_field form.checkinlist_id layout='control' %}
+                    {% bootstrap_field form.checkin_event layout='control' %}
+                    {% bootstrap_field form.checkin_list layout='control' %}
                     {% if form.new_pw %}
                         {% bootstrap_field form.new_pw layout='control' %}
                         {% bootstrap_field form.new_pw_repeat layout='control' %}

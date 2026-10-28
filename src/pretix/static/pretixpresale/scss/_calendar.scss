@@ -47,7 +47,7 @@
     padding: 0;
     margin-bottom: 0;
   }
-  a.event {
+  .event {
     --status-bg-color: var(--pretix-brand-primary-tint-90);
     --status-text-color: var(--pretix-brand-primary-shade-42);
     --status-border-color: #{$brand-primary};
@@ -286,10 +286,10 @@
   overflow-wrap: break-word;
 }
 
-.day-calendar a.event {
+.day-calendar .event {
   margin: 0;
 }
-.day-calendar a.event .event-time {
+.day-calendar .event .event-time {
   display: inline;
 }
 
@@ -456,7 +456,7 @@ if concurrency is higher than 9, JavaScript (currently in pretixpresale/js/ui/ma
 
 
 
-.day-calendar a.event {
+.day-calendar .event {
   --duration: calc(var(--duration-hour, 0)*60 + var(--duration-minute));
   margin-left: calc(var(--offset-start, 0) / var(--duration) * 100%);
   margin-right: calc(var(--offset-end, 0) / var(--duration) * 100%);

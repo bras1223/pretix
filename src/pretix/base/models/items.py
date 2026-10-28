@@ -337,7 +337,13 @@ def filter_available(qs, channel='web', voucher=None, allow_addons=False, allow_
             q &= Q(pk=voucher.item_id)
         elif voucher.quota_id:
             q &= Q(quotas__in=[voucher.quota_id])
-    if not voucher or not voucher.show_hidden_items:
+    # Vouchers that target a specific product/quota always unlock that product, even if it is
+    # marked hide_without_voucher. Otherwise only vouchers with show_hidden_items see them.
+    if not voucher or (
+        not voucher.show_hidden_items
+        and not voucher.item_id
+        and not voucher.quota_id
+    ):
         q &= Q(hide_without_voucher=False)
 
     return qs.filter(q)

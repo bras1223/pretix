@@ -302,6 +302,15 @@ class Voucher(LoggedModel):
         verbose_name=_("Shows hidden products that match this voucher"),
         default=True
     )
+    display_only = models.BooleanField(
+        verbose_name=_("Display only (no purchase)"),
+        default=False,
+        help_text=_(
+            "If enabled, this voucher only unlocks visibility of matching products and dates "
+            "(for example in the calendar). Customers can see availability but cannot use the "
+            "voucher to buy tickets."
+        ),
+    )
     all_addons_included = models.BooleanField(
         verbose_name=_("Offer all add-on products for free when redeeming this voucher"),
         default=False

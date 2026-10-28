@@ -95,12 +95,25 @@ def _discover_plugin_manifests():
 
 
 # Load core manifest
-if not settings.VITE_DEV_MODE and not settings.VITE_IGNORE:
+_MANIFEST_MTIME = None
+
+
+def _load_core_manifest():
+    global _MANIFEST, _MANIFEST_MTIME
+    if settings.VITE_DEV_MODE or settings.VITE_IGNORE:
+        return
     try:
+        mtime = pathlib.Path(MANIFEST_PATH).stat().st_mtime
+        if _MANIFEST and _MANIFEST_MTIME == mtime:
+            return
         with open(MANIFEST_PATH) as fp:
             _MANIFEST = json.load(fp)
+        _MANIFEST_MTIME = mtime
     except Exception as e:
         LOGGER.warning(f"Error reading vite manifest at {MANIFEST_PATH}: {str(e)}")
+
+
+_load_core_manifest()
 
 # Discover plugin manifests
 if not settings.VITE_IGNORE:
@@ -173,7 +186,8 @@ def vite_asset(path):
     if settings.VITE_DEV_MODE:
         return _generate_script_tag(path, {"type": "module"})
 
-    # Prod mode
+    # Prod mode — reload manifest if it changed on disk (e.g. after npm run build:control)
+    _load_core_manifest()
     manifest_entry = _MANIFEST.get(path)
     if not manifest_entry:
         raise RuntimeError(f"Cannot find {path} in Vite manifest at {MANIFEST_PATH}")

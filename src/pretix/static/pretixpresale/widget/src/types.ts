@@ -65,6 +65,7 @@ export interface EventEntry {
 	time?: string
 	continued?: boolean
 	availability: Availability
+	clickable?: boolean
 }
 
 export interface DayEntry {
