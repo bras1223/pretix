@@ -170,6 +170,8 @@ class ScheduledMail(models.Model):
         send_to_orders = self.rule.send_to in (Rule.CUSTOMERS, Rule.BOTH)
         send_to_attendees = self.rule.send_to in (Rule.ATTENDEES, Rule.BOTH)
 
+        position_ids = op_qs.values_list('id', flat=True)
+
         for o in orders:
             with language(o.locale, e.settings.region):
                 positions = list(o.positions.all())
@@ -202,31 +204,32 @@ class ScheduledMail(models.Model):
 
                     seen_attendee_emails = set()
                     for p in positions:
-                        if p.attendee_email and (p.attendee_email != o.email or not o_sent):
-                            if p.attendee_email in seen_attendee_emails:
-                                continue
-                            seen_attendee_emails.add(p.attendee_email)
-                            email_ctx = get_email_context(
-                                event=e,
-                                order=o,
-                                invoice_address=ia,
-                                position=p,
-                                event_or_subevent=self.subevent or e,
-                            )
-                            p.send_mail(self.rule.subject, self.rule.template, email_ctx,
-                                        attach_ical=self.rule.attach_ical,
-                                        log_entry_type='pretix.plugins.sendmail.rule.order.position.email.sent')
-                        elif not o_sent and o.email:
-                            email_ctx = get_email_context(
-                                event=e,
-                                order=o,
-                                invoice_address=ia,
-                                event_or_subevent=self.subevent or e,
-                            )
-                            o.send_mail(self.rule.subject, self.rule.template, email_ctx,
-                                        attach_ical=self.rule.attach_ical,
-                                        log_entry_type='pretix.plugins.sendmail.rule.order.email.sent')
-                            o_sent = True
+                        if p.id in position_ids:
+                            if p.attendee_email and (p.attendee_email != o.email or not o_sent):
+                                if p.attendee_email in seen_attendee_emails:
+                                    continue
+                                seen_attendee_emails.add(p.attendee_email)
+                                email_ctx = get_email_context(
+                                    event=e,
+                                    order=o,
+                                    invoice_address=ia,
+                                    position=p,
+                                    event_or_subevent=self.subevent or e,
+                                )
+                                p.send_mail(self.rule.subject, self.rule.template, email_ctx,
+                                            attach_ical=self.rule.attach_ical,
+                                            log_entry_type='pretix.plugins.sendmail.rule.order.position.email.sent')
+                            elif not o_sent and o.email:
+                                email_ctx = get_email_context(
+                                    event=e,
+                                    order=o,
+                                    invoice_address=ia,
+                                    event_or_subevent=self.subevent or e,
+                                )
+                                o.send_mail(self.rule.subject, self.rule.template, email_ctx,
+                                            attach_ical=self.rule.attach_ical,
+                                            log_entry_type='pretix.plugins.sendmail.rule.order.email.sent')
+                                o_sent = True
 
                 self.last_successful_order_id = o.pk
 
@@ -284,7 +287,7 @@ class Rule(models.Model, LoggingMixin):
 
     date_is_absolute = models.BooleanField(default=True, blank=True)
     offset_to_event_end = models.BooleanField(default=False, blank=True)  # no verbose name because not actually
-    offset_is_after = models.BooleanField(default=False, blank=True)      # displayed in any forms
+    offset_is_after = models.BooleanField(default=False, blank=True)  # displayed in any forms
     offset_relative_to_subevent = models.BooleanField(
         default=True,
         verbose_name=_('Schedule relative to individual event dates'),

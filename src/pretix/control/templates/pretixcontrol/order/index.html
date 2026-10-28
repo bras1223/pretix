@@ -427,6 +427,14 @@
                                 </form>
                             </dd>
                         {% endif %}
+
+                        {% if order.answers.all %}
+                            <hr>
+                        {% endif %}
+                        {% for ans in order.answers.all %}
+                            <dt>{{ ans.question.internal_name|default:ans.question.question }}</dt>
+                            <dd>{% include "pretixcontrol/order/fragment_question_answer.html" with request=request question=ans.question answer=ans %}</dd>
+                        {% endfor %}
                     </dl>
                 </div>
             </div>
@@ -664,31 +672,7 @@
                                                 {% endif %}
                                             </dt>
                                             <dd>
-                                                {% if q.answer %}
-                                                    {% if q.answer.file %}
-                                                        <span class="fa fa-file"></span>
-                                                        <a href="{{ q.answer.backend_file_url }}?token={% answer_token request q.answer %}">
-                                                            {{ q.answer.file_name }}
-                                                        </a>
-                                                        <span class="label label-danger" data-toggle="tooltip"
-                                                                title="{% trans "This file has been uploaded by a user and could contain viruses or other malicious content." %}">
-                                                            {% trans "UNSAFE" %}
-                                                        </span>
-                                                        {% if q.answer.is_image %}
-                                                            <br>
-                                                            <a href="{{ q.answer.backend_file_url }}?token={% answer_token request q.answer %}" data-lightbox="order"
-                                                                class="answer-thumb">
-                                                                <img src="{{ q.answer.backend_file_url }}?token={% answer_token request q.answer %}">
-                                                            </a>
-                                                        {% endif %}
-                                                    {% elif q.type == "M" %}
-                                                        {{ q.answer.to_string_i18n|rich_text_snippet }}
-                                                    {% else %}
-                                                        {{ q.answer.to_string_i18n|linebreaksbr }}
-                                                    {% endif %}
-                                                {% else %}
-                                                    <em>{% trans "not answered" %}</em>
-                                                {% endif %}
+                                                {% include "pretixcontrol/order/fragment_question_answer.html" with request=request question=q answer=q.answer %}
                                             </dd>
                                         {% endfor %}
                                         {% for q in line.additional_fields %}
@@ -705,7 +689,7 @@
                                     {% if line.tax_rate %}
                                         <br/>
                                         <small>
-                                            {% blocktrans trimmed with rate=line.tax_rate|floatformat:-2 taxname=line.tax_rule.name|default:s_taxes %}
+                                            {% blocktrans trimmed with rate=line.tax_rate|tax_rate_format taxname=line.tax_rule.name|default:s_taxes %}
                                                 <strong>plus</strong> {{ rate }}% {{ taxname }}
                                             {% endblocktrans %}
                                         </small>
@@ -715,7 +699,7 @@
                                     {% if line.tax_rate and line.price %}
                                         <br/>
                                         <small>
-                                            {% blocktrans trimmed with rate=line.tax_rate|floatformat:-2 taxname=line.tax_rule.name|default:s_taxes %}
+                                            {% blocktrans trimmed with rate=line.tax_rate|tax_rate_format taxname=line.tax_rule.name|default:s_taxes %}
                                                 incl. {{ rate }}% {{ taxname }}
                                             {% endblocktrans %}
                                         </small>
@@ -755,7 +739,7 @@
                                     {% if fee.tax_rate %}
                                         <br/>
                                         <small>
-                                            {% blocktrans trimmed with rate=fee.tax_rate|floatformat:-2 taxname=fee.tax_rule.name|default:s_taxes %}
+                                            {% blocktrans trimmed with rate=fee.tax_rate|tax_rate_format taxname=fee.tax_rule.name|default:s_taxes %}
                                                 <strong>plus</strong> {{ rate }}% {{ taxname }}
                                             {% endblocktrans %}
                                         </small>
@@ -765,7 +749,7 @@
                                     {% if fee.tax_rate %}
                                         <br/>
                                         <small>
-                                            {% blocktrans trimmed with rate=fee.tax_rate|floatformat:-2 taxname=fee.tax_rule.name|default:s_taxes %}
+                                            {% blocktrans trimmed with rate=fee.tax_rate|tax_rate_format taxname=fee.tax_rule.name|default:s_taxes %}
                                                 incl. {{ rate }}% {{ taxname }}
                                             {% endblocktrans %}
                                         </small>
@@ -833,7 +817,7 @@
                                 <strong>{% trans "Pending total" %}</strong>
                             </div>
                             <div class="col-md-3 col-xs-6 col-md-offset-5 price">
-                                <strong>{{ order.pending_sum|money:event.currency }}</strong>
+                                <strong>{{ pending_sum|money:event.currency }}</strong>
                             </div>
                             <div class="clearfix"></div>
                         </div>
@@ -903,7 +887,7 @@
                                             <tr>
                                                 <td colspan="1"></td>
                                                 <td colspan="5">
-                                                    {{ p.html_info|safe }}
+                                                    {{ p.html_info }}
                                                     {% if staff_session %}
                                                         <p>
                                                             <a href="" class="btn btn-default btn-xs admin-only" data-expandpayment data-id="{{ p.pk }}">
@@ -1018,7 +1002,7 @@
                                                             </dl>
                                                         {% endif %}
                                                         {% if r.html_info %}
-                                                            {{ r.html_info|safe }}
+                                                            {{ r.html_info }}
                                                         {% endif %}
                                                         {% if staff_session %}
                                                             <p>

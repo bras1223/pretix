@@ -27,6 +27,7 @@ from decimal import Decimal
 from io import BytesIO
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.core.files import File
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -70,7 +71,6 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
         if 'placeholders' in request.GET:
             return self.get_placeholders_help(request)
         resp = super().get(request, *args, **kwargs)
-        resp._csp_ignore = True
         return resp
 
     def get_placeholders_help(self, request):
@@ -194,6 +194,7 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
             c.expires = now() + timedelta(days=7)
             c.date = now()
             c.filename = 'background_preview.pdf'
+            c.bind_to_session(request, "ticketoutput-pdf-background")
             c.type = 'application/pdf'
             c.save()
             c.file.save('empty.pdf', ContentFile(buffer.read()))
@@ -219,6 +220,7 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
             c.expires = now() + timedelta(days=7)
             c.date = now()
             c.filename = 'background_preview.pdf'
+            c.bind_to_session(request, "ticketoutput-pdf-background")
             c.type = 'application/pdf'
             c.file = fileobj
             c.save()
@@ -248,6 +250,8 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
         if request.POST.get("background", "").strip():
             try:
                 cf = CachedFile.objects.get(id=request.POST.get("background"), web_download=True)
+                if not cf.allowed_for_session(request, "ticketoutput-pdf-background"):
+                    cf = None
             except CachedFile.DoesNotExist:
                 pass
 
@@ -284,7 +288,7 @@ class BaseEditorView(EventPermissionRequiredMixin, TemplateView):
         ctx['pdf'] = self.get_current_background()
         ctx['variables'] = self.get_variables()
         ctx['images'] = self.get_images()
-        ctx['layout'] = json.dumps(self.get_current_layout())
+        ctx['layout'] = self.get_current_layout()
         ctx['title'] = self.title
         ctx['locales'] = [p for p in settings.LANGUAGES if p[0] in self.request.event.settings.locales]
         ctx['maxfilesize'] = self.maxfilesize
@@ -303,6 +307,8 @@ class FontsCSSView(TemplateView):
 
 class PdfView(TemplateView):
     def get(self, request, *args, **kwargs):
-        cf = get_object_or_404(CachedFile, id=kwargs.get("filename"), filename="background_preview.pdf")
+        cf = get_object_or_404(CachedFile, id=kwargs.get("filename"), filename="background_preview.pdf", web_download=True)
+        if not cf.allowed_for_session(request, "ticketoutput-pdf-background"):
+            raise PermissionDenied()
         resp = FileResponse(cf.file, filename=cf.filename, content_type='application/pdf')
         return resp

@@ -20,12 +20,13 @@
 # <https://www.gnu.org/licenses/>.
 #
 
+from django.db.models import Prefetch
 from django.dispatch import receiver
 from django.utils.formats import date_format
 from django.utils.translation import gettext_lazy as _, pgettext, pgettext_lazy
 
 from ..exporter import ListExporter, OrganizerLevelExportMixin
-from ..models import ReusableMedium
+from ..models import OrderPosition, ReusableMedium
 from ..signals import register_multievent_data_exporters
 
 
@@ -44,7 +45,9 @@ class ReusableMediaExporter(OrganizerLevelExportMixin, ListExporter):
         media = ReusableMedium.objects.filter(
             organizer=self.organizer,
         ).select_related(
-            'customer', 'linked_orderposition', 'linked_giftcard',
+            'customer', 'linked_giftcard',
+        ).prefetch_related(
+            Prefetch('linked_orderpositions', queryset=OrderPosition.objects.select_related("order"))
         ).order_by('created')
 
         headers = [
@@ -74,7 +77,7 @@ class ReusableMediaExporter(OrganizerLevelExportMixin, ListExporter):
                 _('Yes') if medium.active else _('No'),
                 date_format(medium.expires, 'SHORT_DATETIME_FORMAT') if medium.expires else '',
                 medium.customer.identifier if medium.customer_id else '',
-                f"{medium.linked_orderposition.order.code}-{medium.linked_orderposition.positionid}" if medium.linked_orderposition_id else '',
+                ', '.join([f"{op.order.code}-{op.positionid}" for op in medium.linked_orderpositions.all()]),
                 giftcard_secret,
                 medium.notes,
             ]
