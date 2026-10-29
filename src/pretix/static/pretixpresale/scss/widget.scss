@@ -547,9 +547,9 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
   .pretix-widget-event-list-entry {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
-    padding: 8px 5px;
+    padding: 6px 0;
     color: $text-color;
 
     &.pretix-widget-event-not-clickable {
@@ -565,38 +565,38 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
       text-decoration: none;
     }
 
-    .pretix-widget-event-list-entry-main {
-      flex: 1 1 auto;
-      min-width: 0;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      column-gap: 12px;
-      row-gap: 2px;
-    }
     .pretix-widget-event-list-entry-name {
-      flex: 1 1 auto;
-      min-width: 0;
-      padding: 0;
+      width: 55%;
+      padding: 4px 8px 4px 5px;
       box-sizing: border-box;
+      font-weight: 600;
+    }
+    .pretix-widget-event-list-entry-crowd {
+      width: 45%;
+      padding: 4px 5px;
+      box-sizing: border-box;
+      text-align: right;
+      font-size: 90%;
+      color: $text-muted;
+      min-height: 1.2em;
     }
     .pretix-widget-event-list-entry-location {
-      padding: 0;
+      padding: 5px;
       box-sizing: border-box;
       display: none;
       width: 100%;
     }
     .pretix-widget-event-list-entry-date {
-      flex: 0 1 auto;
-      padding: 0;
+      width: 55%;
+      padding: 2px 8px 4px 5px;
       box-sizing: border-box;
       color: $text-muted;
-      white-space: nowrap;
+      font-size: 90%;
     }
     .pretix-widget-event-list-entry-availability {
-      flex: 0 0 auto;
+      width: 45%;
       text-align: right;
-      padding: 0;
+      padding: 2px 5px 4px;
       box-sizing: border-box;
       span {
         position: relative;
@@ -1090,25 +1090,16 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
   }
 
   .pretix-widget-event-list-entry {
-    align-items: flex-start;
-
-    .pretix-widget-event-list-entry-main {
-      flex-direction: column;
-      align-items: stretch;
-      row-gap: 2px;
+    .pretix-widget-event-list-entry-name,
+    .pretix-widget-event-list-entry-date {
+      width: 50%;
     }
-    .pretix-widget-event-list-entry-crowd {
-      text-align: right;
-      padding: 0;
+    .pretix-widget-event-list-entry-crowd,
+    .pretix-widget-event-list-entry-availability {
+      width: 50%;
     }
     .pretix-widget-event-list-entry-location {
       width: 100%;
-    }
-    .pretix-widget-event-list-entry-date {
-      white-space: normal;
-    }
-    .pretix-widget-event-list-entry-availability {
-      padding-top: 2px;
     }
   }
 

@@ -533,7 +533,7 @@ class WidgetAPIProductList(EventListMixin, View):
                 'time': time,
                 'continued': e['continued'],
                 'location': str(ev.location),
-                'crowd': str(ev.crowd),
+                'crowd': str(ev.crowd) if ev.crowd else '',
                 'date_range': self._get_date_range(ev, event, tz=tz),
                 'availability': self._get_availability(ev, event, tz=tz, display_only=display_only),
                 'event_url': eventreverse_absolute(event, 'presale:event.index'),
@@ -752,6 +752,7 @@ class WidgetAPIProductList(EventListMixin, View):
                     {
                         'name': str(ev.name),
                         'location': str(ev.location),
+                        'crowd': str(ev.crowd) if ev.crowd else '',
                         'date_range': self._get_date_range(ev, ev.event, tz),
                         'availability': self._get_availability(ev, ev.event, tz=tz, display_only=display_only),
                         'event_url': eventreverse_absolute(ev.event, 'presale:event.index'),

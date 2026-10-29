@@ -48,7 +48,9 @@ a(
 	.pretix-widget-event-calendar-event-row
 		strong.pretix-widget-event-calendar-event-name {{ event.name }}
 		.pretix-widget-event-calendar-event-availability(v-if="!event.continued && event.availability.text") {{ event.availability.text }}
-	.pretix-widget-event-calendar-event-date(v-if="!event.continued && event.time") {{ event.time }}
+	.pretix-widget-event-calendar-event-meta(v-if="!event.continued && (event.time || event.crowd)")
+		.pretix-widget-event-calendar-event-date(v-if="event.time") {{ event.time }}
+		.pretix-widget-event-calendar-event-crowd(v-if="event.crowd") {{ event.crowd }}
 </template>
 <style lang="sass">
 .pretix-widget-event-calendar-event-row
@@ -66,4 +68,16 @@ a(
 	font-size: 75%
 	font-weight: bold
 	white-space: nowrap
+
+.pretix-widget-event-calendar-event-meta
+	display: flex
+	justify-content: space-between
+	gap: 8px
+	margin-top: 2px
+	font-size: 85%
+	opacity: 0.9
+
+.pretix-widget-event-calendar-event-crowd
+	margin-left: auto
+	text-align: right
 </style>

@@ -62,6 +62,7 @@ export interface EventEntry {
 	subevent?: number | string
 	date_range: string
 	location: string
+	crowd?: string
 	time?: string
 	continued?: boolean
 	availability: Availability
