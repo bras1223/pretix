@@ -547,8 +547,9 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
   .pretix-widget-event-list-entry {
     display: flex;
     flex-direction: row;
-    padding: 5px 0;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 5px;
     color: $text-color;
 
     &.pretix-widget-event-not-clickable {
@@ -564,29 +565,42 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
       text-decoration: none;
     }
 
+    .pretix-widget-event-list-entry-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      column-gap: 12px;
+      row-gap: 2px;
+    }
     .pretix-widget-event-list-entry-name {
-      width: 50%;
-      padding: 5px;
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 0;
       box-sizing: border-box;
     }
     .pretix-widget-event-list-entry-location {
-      padding: 5px;
+      padding: 0;
       box-sizing: border-box;
       display: none;
+      width: 100%;
     }
     .pretix-widget-event-list-entry-date {
-      width: 25%;
-      padding: 5px;
+      flex: 0 1 auto;
+      padding: 0;
       box-sizing: border-box;
+      color: $text-muted;
+      white-space: nowrap;
     }
     .pretix-widget-event-list-entry-availability {
-      width: 25%;
+      flex: 0 0 auto;
       text-align: right;
-      padding: 7px 5px 3px;
+      padding: 0;
       box-sizing: border-box;
       span {
         position: relative;
-        display: inline;
+        display: inline-block;
         padding: 6px 6px 4px 17px;
         font-size: 75%;
         font-weight: bold;
@@ -714,6 +728,23 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
         margin-bottom: 0;
       }
       text-decoration: none;
+
+      .pretix-widget-event-calendar-event-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .pretix-widget-event-calendar-event-name {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .pretix-widget-event-calendar-event-availability {
+        flex: 0 0 auto;
+        font-size: 75%;
+        font-weight: bold;
+        white-space: nowrap;
+      }
     }
 
     .pretix-widget-event-calendar-table {
@@ -1059,22 +1090,25 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
   }
 
   .pretix-widget-event-list-entry {
-    .pretix-widget-event-list-entry-name {
-      width: 50%;
+    align-items: flex-start;
+
+    .pretix-widget-event-list-entry-main {
+      flex-direction: column;
+      align-items: stretch;
+      row-gap: 2px;
     }
     .pretix-widget-event-list-entry-crowd {
-      width: 50%;
       text-align: right;
-      padding: 7px 5px 3px;
+      padding: 0;
     }
     .pretix-widget-event-list-entry-location {
       width: 100%;
     }
     .pretix-widget-event-list-entry-date {
-      width: 50%;
+      white-space: normal;
     }
     .pretix-widget-event-list-entry-availability {
-      width: 50%;
+      padding-top: 2px;
     }
   }
 
@@ -1095,6 +1129,9 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
       padding-bottom: 5px;
       border-radius: $input-border-radius;
       cursor: pointer;
+    }
+    td.pretix-widget-day-not-openable .pretix-widget-event-calendar-day {
+      cursor: default;
     }
 
     .pretix-widget-event-calendar-head {

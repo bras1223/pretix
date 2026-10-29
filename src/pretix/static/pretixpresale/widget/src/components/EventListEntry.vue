@@ -43,12 +43,40 @@ component(
 	:aria-disabled="!isClickable ? 'true' : undefined",
 	@click.prevent.stop="select"
 )
-	.pretix-widget-event-list-entry-name {{ event.name }}
-	.pretix-widget-event-list-entry-date {{ event.date_range }}
-	//- hidden by css for now, but used by a few people
-	.pretix-widget-event-list-entry-location {{ location }}
+	.pretix-widget-event-list-entry-main
+		.pretix-widget-event-list-entry-name {{ event.name }}
+		.pretix-widget-event-list-entry-date {{ event.date_range }}
+		//- hidden by css for now, but used by a few people
+		.pretix-widget-event-list-entry-location {{ location }}
 	.pretix-widget-event-list-entry-availability
 		span {{ event.availability.text }}
 </template>
 <style lang="sass">
+.pretix-widget-event-list-entry
+	display: flex
+	flex-direction: row
+	flex-wrap: nowrap
+	align-items: center
+	gap: 12px
+
+	.pretix-widget-event-list-entry-main
+		flex: 1 1 auto
+		min-width: 0
+		display: flex
+		flex-wrap: wrap
+		align-items: baseline
+		column-gap: 12px
+		row-gap: 2px
+
+	.pretix-widget-event-list-entry-name,
+	.pretix-widget-event-list-entry-date
+		width: auto
+		padding: 0
+
+	.pretix-widget-event-list-entry-availability
+		flex: 0 0 auto
+		width: auto
+		margin-left: auto
+		padding: 0
+		text-align: right
 </style>

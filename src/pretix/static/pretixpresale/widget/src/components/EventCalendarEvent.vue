@@ -15,7 +15,6 @@ const isClickable = computed(() => props.event.clickable !== false)
 const classObject = computed(() => {
 	const o: Record<string, boolean> = {
 		'pretix-widget-event-calendar-event': true,
-		'pretix-widget-event-not-clickable': !isClickable.value,
 	}
 	o[`pretix-widget-event-availability-${props.event.availability.color}`] = true
 	if (props.event.availability.reason) {
@@ -25,7 +24,12 @@ const classObject = computed(() => {
 })
 
 function select () {
-	if (!isClickable.value) return
+	if (!isClickable.value) {
+		// Display-only: show list detail instead of opening the shop
+		store.events = [props.event]
+		store.view = 'events'
+		return
+	}
 	store.parentStack.push(store.targetUrl)
 	store.targetUrl = props.event.event_url
 	store.error = null
@@ -35,17 +39,31 @@ function select () {
 }
 </script>
 <template lang="pug">
-component(
-	:is="isClickable ? 'a' : 'span'",
-	:href="isClickable ? '#' : undefined",
+a(
+	href="#",
 	:class="classObject",
 	:aria-describedby="describedby",
-	:aria-disabled="!isClickable ? 'true' : undefined",
 	@click.prevent.stop="select"
 )
-	strong.pretix-widget-event-calendar-event-name {{ event.name }}
+	.pretix-widget-event-calendar-event-row
+		strong.pretix-widget-event-calendar-event-name {{ event.name }}
+		.pretix-widget-event-calendar-event-availability(v-if="!event.continued && event.availability.text") {{ event.availability.text }}
 	.pretix-widget-event-calendar-event-date(v-if="!event.continued && event.time") {{ event.time }}
-	.pretix-widget-event-calendar-event-availability(v-if="!event.continued && event.availability.text") {{ event.availability.text }}
 </template>
 <style lang="sass">
+.pretix-widget-event-calendar-event-row
+	display: flex
+	align-items: baseline
+	justify-content: space-between
+	gap: 8px
+
+.pretix-widget-event-calendar-event-name
+	flex: 1 1 auto
+	min-width: 0
+
+.pretix-widget-event-calendar-event-availability
+	flex: 0 0 auto
+	font-size: 75%
+	font-weight: bold
+	white-space: nowrap
 </style>

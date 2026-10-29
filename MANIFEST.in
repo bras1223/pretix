@@ -35,6 +35,8 @@ recursive-include src/pretix/plugins/webcheckin/templates *
 recursive-include src/pretix/plugins/webcheckin/static *
 recursive-include src/pretix/plugins/webcheckinbrand/templates *
 recursive-include src/pretix/plugins/webcheckinbrand/static *
+recursive-include src/pretix/plugins/wwpcheckin/templates *
+recursive-include src/pretix/plugins/wwpcheckin/static *
 recursive-include src *.cfg
 recursive-include src *.csv
 recursive-include src *.gitkeep
