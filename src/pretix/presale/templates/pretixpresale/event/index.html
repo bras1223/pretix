@@ -89,12 +89,20 @@
             <h2 class="panel-title"><strong>
                 {% if subevent_list_foldable %}
                     {% if show_cart %}
-                        {% trans "Add tickets for a different date" %}
+                        {% if request.event.is_form %}
+                            {% trans "Register for a different date" %}
+                        {% else %}
+                            {% trans "Add tickets for a different date" %}
+                        {% endif %}
                     {% else %}
                         {% trans "View other date" %}
                     {% endif %}
                 {% else %}
-                    {% trans "Choose date to book a ticket" %}
+                    {% if request.event.is_form %}
+                        {% trans "Choose a date to register" %}
+                    {% else %}
+                        {% trans "Choose date to book a ticket" %}
+                    {% endif %}
                 {% endif %}</strong>
             </h2>
             {% if subevent_list_foldable %}

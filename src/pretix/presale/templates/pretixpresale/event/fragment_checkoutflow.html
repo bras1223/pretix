@@ -23,7 +23,11 @@
             <span class="fa fa-ticket" aria-hidden="true"></span>
         </div>
         <div class="checkout-step-label">
-            {% trans "Order confirmed" context "checkoutflow" %}
+            {% if request.event.is_form %}
+                {% trans "Registration confirmed" context "checkoutflow" %}
+            {% else %}
+                {% trans "Order confirmed" context "checkoutflow" %}
+            {% endif %}
         </div>
     </li>
 </ol>

@@ -5,28 +5,28 @@
 {% load eventurl %}
 {% load eventsignal %}
 {% load getitem %}
-{% block title %}{% trans "Review order" %}{% endblock %}
+{% block title %}{% if request.event.is_form %}{% trans "Review registration" %}{% else %}{% trans "Review order" %}{% endif %}{% endblock %}
 {% block content %}
-<main aria-label="{% trans "Review order" %}">
+<main aria-label="{% if request.event.is_form %}{% trans "Review registration" %}{% else %}{% trans "Review order" %}{% endif %}">
     {% if not request.event.is_voting %}
         {% if not request.event.is_form %}
         <h2>{% trans "Review order" %}</h2>
-        {%else%}
-        <h2>Aanmelding controleren</h2>
-        {%endif%}
-    {%else%}
+        {% else %}
+        <h2>{% trans "Review registration" %}</h2>
+        {% endif %}
+    {% else %}
     <h2>Stum kontrolieëre</h2>
-    {%endif%}
+    {% endif %}
     {% include "pretixpresale/event/fragment_checkoutflow.html" %}
     {% if not request.event.is_voting and not request.event.is_form %}
         <p>{% trans "Please review the details below and confirm your order." %}</p>
-    {%else%}
+    {% else %}
         {% if not request.event.is_form %}
             <p>Kontrolieërtj en versteurtj heej eur stum</p>
-        {%else %}
-            <p>Controleer je aanmelding</p>
-        {%endif%}
-    {%endif%}
+        {% else %}
+            <p>{% trans "Please review the details below and confirm your registration." %}</p>
+        {% endif %}
+    {% endif %}
     <div class="panel panel-primary cart">
         <div class="panel-heading panel-heading-flex">
             <h3 class="panel-title">

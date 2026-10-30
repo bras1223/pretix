@@ -37,7 +37,11 @@
         <p class="col-md-2 col-xs-6 text-right flip">
             <a class="btn btn-primary btn-block" href="{% if request.GET.voucher %}{% eventurl event "presale:event.redeem" cart_namespace=cart_namespace %}?voucher={{ request.GET.voucher|urlencode }}&amp;subevent={{ subev.pk }}{% else %}{% eventurl event "presale:event.index" subevent=subev.id cart_namespace=cart_namespace %}{% endif %}">
                 {% if subev.presale_is_running and subev.best_availability_state == 100 %}
-                    {% icon "ticket" %} {% trans "Tickets" %}
+                    {% if event.is_form %}
+                        {% icon "pencil" %} {% trans "Sign up" %}
+                    {% else %}
+                        {% icon "ticket" %} {% trans "Tickets" %}
+                    {% endif %}
                 {% else %}
                     {% icon "info" %} {% trans "More info" %}
                 {% endif %}

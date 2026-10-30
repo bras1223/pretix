@@ -35980,6 +35980,18 @@ msgid "Choose date to book a ticket"
 msgstr "Kies een datum om een ticket te kopen"
 
 #: pretix/presale/templates/pretixpresale/event/index.html
+msgid "Choose a date to register"
+msgstr "Kies een datum om aan te melden"
+
+#: pretix/presale/templates/pretixpresale/event/index.html
+msgid "Register for a different date"
+msgstr "Meld je aan voor een andere datum"
+
+#: pretix/presale/templates/pretixpresale/event/fragment_subevent_list.html
+msgid "Sign up"
+msgstr "Aanmelden"
+
+#: pretix/presale/templates/pretixpresale/event/index.html
 #: pretix/presale/views/waiting.py pretix/presale/views/widget.py
 msgid "The booking period for this event is over."
 msgstr "De verkoopperiode voor dit evenement is afgelopen."
@@ -37650,6 +37662,186 @@ msgstr "Schrijftoegang"
 #: pretix/settings.py
 msgid "Kosovo"
 msgstr "Kosovo"
+
+# Caught-specific features
+#: pretix/base/models/vouchers.py
+msgid "Display only (no purchase)"
+msgstr "Alleen weergeven (geen aankoop)"
+
+#: pretix/base/models/vouchers.py
+msgid ""
+"If enabled, this voucher only unlocks visibility of matching products and dates "
+"(for example in the calendar). Customers can see availability but cannot use the "
+"voucher to buy tickets."
+msgstr ""
+"Indien ingeschakeld ontgrendelt deze voucher alleen de zichtbaarheid van "
+"overeenkomende producten en data (bijvoorbeeld in de kalender). Klanten kunnen "
+"beschikbaarheid zien, maar de voucher niet gebruiken om tickets te kopen."
+
+#: pretix/base/services/cart.py
+msgid ""
+"This voucher can only be used to view availability and cannot be used for purchases."
+msgstr ""
+"Deze voucher kan alleen worden gebruikt om beschikbaarheid te bekijken en niet "
+"om aankopen te doen."
+
+#: pretix/base/models/event.py
+msgid "Voting"
+msgstr "Stemming"
+
+#: pretix/base/models/event.py
+msgid ""
+"If selected, this event will be adapted for voting. This will remove all pricing-references"
+msgstr ""
+"Indien geselecteerd wordt dit evenement aangepast voor stemmen. Alle "
+"prijsverwijzingen worden verwijderd."
+
+#: pretix/base/models/event.py
+msgid "Form"
+msgstr "Formulier"
+
+#: pretix/base/models/event.py
+msgid ""
+"If selected, this event will be adapted as form. This will remove all pricing-references"
+msgstr ""
+"Indien geselecteerd wordt dit evenement als formulier gebruikt. Alle "
+"prijsverwijzingen worden verwijderd."
+
+#: pretix/base/models/event.py
+#: pretix/control/templates/pretixcontrol/subevents/detail.html
+msgid "Crowd"
+msgstr "Drukte"
+
+#: pretix/base/models/auth.py
+msgid "Auth token"
+msgstr "Auth-token"
+
+#: pretix/base/models/auth.py
+msgid "Checkin-list ID"
+msgstr "Check-inlijst-ID"
+
+#: pretix/control/forms/users.py
+msgid "Check-in event"
+msgstr "Check-in-evenement"
+
+#: pretix/control/forms/users.py
+msgid "Event used when logging in via a check-in auth token."
+msgstr "Evenement dat wordt gebruikt bij inloggen via een check-in auth-token."
+
+#: pretix/control/forms/users.py
+msgid "Check-in list opened after token login."
+msgstr "Check-inlijst die na token-login wordt geopend."
+
+#: pretix/plugins/wwpcheckin/apps.py
+#: pretix/plugins/wwpcheckin/signals.py
+msgid "WWP Check-in"
+msgstr "WWP Check-in"
+
+#: pretix/plugins/wwpcheckin/apps.py
+msgid "Caught"
+msgstr "Caught"
+
+#: pretix/plugins/wwpcheckin/apps.py
+msgid ""
+"Web check-in that shows all tickets in an order when scanning one ticket, "
+"with options to check in individually or all at once."
+msgstr ""
+"Web check-in die alle tickets in een bestelling toont bij het scannen van één "
+"ticket, met opties om apart of alles tegelijk in te checken."
+
+#: pretix/plugins/webcheckinbrand/apps.py
+msgid "Web-based check-in - Brandslang"
+msgstr "Webgebaseerde check-in - Brandslang"
+
+#: pretix/plugins/sendmail/models.py
+msgid "Schedule relative to individual event dates"
+msgstr "Plannen ten opzichte van individuele evenementdata"
+
+#: pretix/plugins/sendmail/models.py
+msgid ""
+"If enabled, a separate email is scheduled for each event date based on that date. "
+"If disabled, one email is scheduled relative to the main event date."
+msgstr ""
+"Indien ingeschakeld wordt er per evenementdatum een aparte e-mail gepland op basis "
+"van die datum. Indien uitgeschakeld wordt één e-mail gepland ten opzichte van de "
+"hoofd-evenementdatum."
+
+#: pretix/plugins/sendmail/forms.py
+msgid "Schedule relative to"
+msgstr "Plannen ten opzichte van"
+
+#: pretix/plugins/sendmail/forms.py
+msgid "Individual event dates"
+msgstr "Individuele evenementdata"
+
+#: pretix/plugins/sendmail/forms.py
+msgid "Main event"
+msgstr "Hoofdevenement"
+
+#: pretix/plugins/sendmail/forms.py
+msgid ""
+"If you schedule relative to individual event dates, customers with tickets for multiple "
+"dates receive one email per date. If you schedule relative to the main event, each customer "
+"receives one email."
+msgstr ""
+"Als u plant ten opzichte van individuele evenementdata, ontvangen klanten met tickets "
+"voor meerdere data één e-mail per datum. Als u plant ten opzichte van het "
+"hoofdevenement, ontvangt elke klant één e-mail."
+
+#: pretix/plugins/sendmail/models.py
+#, python-format
+msgid "%(count)d day after event date end at %(time)s"
+msgid_plural "%(count)d days after event date end at %(time)s"
+msgstr[0] "%(count)d dag na einde evenementdatum om %(time)s"
+msgstr[1] "%(count)d dagen na einde evenementdatum om %(time)s"
+
+#: pretix/plugins/sendmail/models.py
+#, python-format
+msgid "%(count)d day before event date end at %(time)s"
+msgid_plural "%(count)d days before event date end at %(time)s"
+msgstr[0] "%(count)d dag voor einde evenementdatum om %(time)s"
+msgstr[1] "%(count)d dagen voor einde evenementdatum om %(time)s"
+
+#: pretix/plugins/sendmail/models.py
+#, python-format
+msgid "%(count)d day after event date start at %(time)s"
+msgid_plural "%(count)d days after event date start at %(time)s"
+msgstr[0] "%(count)d dag na start evenementdatum om %(time)s"
+msgstr[1] "%(count)d dagen na start evenementdatum om %(time)s"
+
+#: pretix/plugins/sendmail/models.py
+#, python-format
+msgid "%(count)d day before event date start at %(time)s"
+msgid_plural "%(count)d days before event date start at %(time)s"
+msgstr[0] "%(count)d dag voor start evenementdatum om %(time)s"
+msgstr[1] "%(count)d dagen voor start evenementdatum om %(time)s"
+
+#: pretix/presale/checkoutflow.py
+msgctxt "checkoutflow"
+msgid "Review registration"
+msgstr "Controleer aanmelding"
+
+#: pretix/presale/templates/pretixpresale/event/checkout_confirm.html
+msgid "Review registration"
+msgstr "Controleer aanmelding"
+
+#: pretix/presale/templates/pretixpresale/event/checkout_confirm.html
+msgid "Please review the details below and confirm your registration."
+msgstr "Controleer de onderstaande gegevens en bevestig uw aanmelding."
+
+#: pretix/presale/templates/pretixpresale/event/fragment_checkoutflow.html
+msgctxt "checkoutflow"
+msgid "Registration confirmed"
+msgstr "Aanmelding bevestigd"
+
+#: pretix/presale/forms/checkout.py
+msgid ""
+"Make sure to enter a valid email address. We will send you a registration "
+"confirmation including a link that you need to access your registration later."
+msgstr ""
+"Zorg ervoor dat u een geldig e-mailadres opgeeft. We sturen u een "
+"aanmeldbevestiging met een link die u nodig hebt om uw aanmelding later te "
+"openen."
 
 #~ msgid "SSO provider:"
 #~ msgstr "SSO-provider:"

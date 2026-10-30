@@ -66,6 +66,9 @@ export const STRINGS: Record<string, string> = {
 	'status.inside': gettext('Currently inside'),
 	yes: gettext('Yes'),
 	no: gettext('No'),
+	'scan.duplicate': gettext(
+		'You scanned this code twice. Was that intentional?'
+	),
 }
 
 export interface SubEvent {

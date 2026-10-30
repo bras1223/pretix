@@ -1,46 +1,55 @@
 <template>
-  <div> <!-- single root -->
-    <div v-if="confirmVisible" class="confirm-overlay">
-      <div class="confirm-dialog">
-        <p class="confirm-text">Je hebt deze kaart zojuist al gescand. Wil je hem opnieuw scannen?</p>
+  <div>
+    <div v-if="confirmVisible" class="confirm-overlay" @click.self="onConfirm(false)">
+      <div class="confirm-dialog" role="dialog" aria-modal="true">
+        <p class="confirm-text">{{ confirmText }}</p>
         <div class="confirm-actions">
-          <button class="btn btn-confirm" @click="onConfirm(true)">Ja</button>
-          <button class="btn btn-cancel" @click="onConfirm(false)">Nee</button>
+          <button type="button" class="btn btn-confirm" @click="onConfirm(true)">{{ yesText }}</button>
+          <button type="button" class="btn btn-cancel" @click="onConfirm(false)">{{ noText }}</button>
         </div>
       </div>
     </div>
-  <div id="qr-scanner">
-    <div id="reader" style="width: 100%"></div>
-  </div>
+    <div id="qr-scanner">
+      <div id="reader" style="width: 100%"></div>
+    </div>
   </div>
 </template>
 
 <script>
+import { STRINGS } from '../i18n'
+
+// Treat the same code as still "in view" if we see it again within this window.
+const PRESENT_MS = 1500
+
 export default {
   data() {
     return {
       qrCodeScanner: null,
       confirmVisible: false,
       pendingDecodedText: null,
-      lastScannedCode: null, // Cache to prevent consecutive duplicates
-      lastScannedTime: null, // Track the time of the last scan
-    };
+      lastEmittedCode: null,
+      lastSeenCode: null,
+      lastSeenAt: null,
+      confirmText: STRINGS['scan.duplicate'],
+      yesText: STRINGS['yes'],
+      noText: STRINGS['no'],
+    }
   },
   methods: {
     startScanner() {
       if (!window.Html5Qrcode) {
-        console.error("Html5Qrcode library is not loaded.");
-        return;
+        console.error('Html5Qrcode library is not loaded.')
+        return
       }
 
-      let qrboxFunction = function(viewfinderWidth, viewfinderHeight) {
-        let minEdgePercentage = 0.7; // 70%
-        let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-        let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+      const qrboxFunction = function (viewfinderWidth, viewfinderHeight) {
+        const minEdgePercentage = 0.7
+        const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight)
+        const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage)
         return {
           width: qrboxSize,
-          height: qrboxSize
-        };
+          height: qrboxSize,
+        }
       }
 
       const config = {
@@ -48,73 +57,92 @@ export default {
         qrbox: qrboxFunction,
         aspectRatio: 1.333334,
         showTorchButtonIfSupported: true,
-      };
-      this.qrCodeScanner = new window.Html5Qrcode("reader");
+      }
+      this.qrCodeScanner = new window.Html5Qrcode('reader')
 
       const onScan = (decodedText) => {
-            const now = Date.now();
+        const now = Date.now()
 
-            const isDuplicate = decodedText === this.lastScannedCode;
-            const isWithinFourSeconds = this.lastScannedTime && (now - this.lastScannedTime) < 6000;
+        if (this.confirmVisible) {
+          return
+        }
 
-            if ((isDuplicate && isWithinFourSeconds) || decodedText === this.pendingDecodedText) {
-              return;
-            }
+        const stillPresent =
+          decodedText === this.lastSeenCode &&
+          this.lastSeenAt &&
+          now - this.lastSeenAt < PRESENT_MS
 
-            if (isDuplicate && !isWithinFourSeconds) {
-              if (isDuplicate && !isWithinFourSeconds) {
-                this.pendingDecodedText = decodedText;
-                this.confirmVisible = true; // Show custom confirm modal
-              }
-            } else {
-              // If different code or enough time has passed, process it
-              this.lastScannedCode = decodedText;
-              this.lastScannedTime = Date.now(); // Update the scan time
+        this.lastSeenCode = decodedText
+        this.lastSeenAt = now
 
-              // Emit scanned result to parent component
-              this.$emit("qr-scanned", decodedText);
-            }
-      };
+        if (stillPresent) {
+          return
+        }
+
+        // Code (re)appeared after leaving the view.
+        if (decodedText === this.lastEmittedCode) {
+          this.pendingDecodedText = decodedText
+          this.confirmVisible = true
+          return
+        }
+
+        this.emitScan(decodedText)
+      }
 
       const cameraConfigs = [
-        { facingMode: "environment" },
-        { facingMode: "user" },
+        { facingMode: 'environment' },
+        { facingMode: 'user' },
         true,
-      ];
+      ]
 
       const tryStart = (index) => {
         if (index >= cameraConfigs.length) {
-          console.error("Could not start QR scanner: no suitable camera found.");
-          return;
+          console.error('Could not start QR scanner: no suitable camera found.')
+          return
         }
-        this.qrCodeScanner.start(
-          cameraConfigs[index],
-          config,
-          onScan,
-          () => {},
-        ).catch(() => tryStart(index + 1));
-      };
+        this.qrCodeScanner
+          .start(cameraConfigs[index], config, onScan, () => {})
+          .catch(() => tryStart(index + 1))
+      }
 
-      tryStart(0);
+      tryStart(0)
+    },
+    emitScan(decodedText) {
+      this.lastEmittedCode = decodedText
+      this.lastSeenCode = decodedText
+      this.lastSeenAt = Date.now()
+      this.$emit('qr-scanned', decodedText)
     },
     onConfirm(confirmed) {
-      if (confirmed && this.pendingDecodedText) {
-        this.lastScannedCode = this.pendingDecodedText;
-        this.lastScannedTime = Date.now();
-        this.$emit("qr-scanned", this.pendingDecodedText);
+      const code = this.pendingDecodedText
+      this.pendingDecodedText = null
+      this.confirmVisible = false
+
+      if (confirmed && code) {
+        this.emitScan(code)
+        return
       }
-      // Reset confirmation state
-      this.pendingDecodedText = null;
-      this.confirmVisible = false;
+
+      // Declined: keep treating this code as already handled until it leaves the view.
+      if (code) {
+        this.lastEmittedCode = code
+        this.lastSeenCode = code
+        this.lastSeenAt = Date.now()
+      }
     },
   },
   mounted() {
-    this.startScanner();
+    this.startScanner()
+  },
+  beforeUnmount() {
+    if (this.qrCodeScanner) {
+      this.qrCodeScanner.stop().catch(() => {})
+    }
   },
   beforeDestroy() {
     if (this.qrCodeScanner) {
-      this.qrCodeScanner.stop();
+      this.qrCodeScanner.stop().catch(() => {})
     }
   },
-};
+}
 </script>

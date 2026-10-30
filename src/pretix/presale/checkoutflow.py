@@ -55,7 +55,7 @@ from django.utils.functional import cached_property
 from django.utils.html import conditional_escape
 from django.utils.timezone import now
 from django.utils.translation import (
-    get_language, gettext_lazy as _, pgettext_lazy,
+    get_language, gettext_lazy as _, pgettext, pgettext_lazy,
 )
 from django.views.generic.base import TemplateResponseMixin
 from django_scopes import scopes_disabled
@@ -1580,8 +1580,13 @@ class ConfirmStep(CartMixin, AsyncAction, TemplateFlowStep):
     template_name = "pretixpresale/event/checkout_confirm.html"
     task = perform_order
     known_errortypes = ['OrderError']
-    label = pgettext_lazy('checkoutflow', 'Review order')
     icon = 'eye'
+
+    @property
+    def label(self):
+        if self.event.is_form:
+            return pgettext('checkoutflow', 'Review registration')
+        return pgettext('checkoutflow', 'Review order')
 
     def is_applicable(self, request):
         return True

@@ -338,6 +338,10 @@ msgstr "Ja"
 msgid "No"
 msgstr "Nee"
 
+#: pretix/plugins/webcheckinbrand/static/pretixplugins/webcheckinbrand/i18n.ts
+msgid "You scanned this code twice. Was that intentional?"
+msgstr "Je hebt deze code twee keer gescand. Was dat de bedoeling?"
+
 #: pretix/static/lightbox/js/lightbox.js
 msgid "close"
 msgstr "sluiten"
