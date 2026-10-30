@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sendmail', '0011_remove_cross_event_scheduled_mails_squashed_0012_remove_cross_event_scheduled_mails'),
+        ('sendmail', '0013_activate_plugin_for_events_with_scheduled_mails'),
     ]
 
     operations = [
