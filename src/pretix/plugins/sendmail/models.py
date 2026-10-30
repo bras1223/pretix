@@ -19,6 +19,7 @@
 # You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 # <https://www.gnu.org/licenses/>.
 #
+import logging
 from datetime import datetime, time, timedelta
 
 from dateutil.tz import datetime_exists
@@ -38,6 +39,8 @@ from pretix.base.models import (
     fields,
 )
 from pretix.base.models.base import LoggingMixin
+
+logger = logging.getLogger(__name__)
 
 
 class ScheduledMail(models.Model):
@@ -115,23 +118,15 @@ class ScheduledMail(models.Model):
 
         filter_orders_by_op = False
         op_qs = OrderPosition.objects.filter(
-            order__event=self.event,
+            order__event=e,
             canceled=False,
         )
 
-        if self.subevent_id:
+        if self.subevent:
             filter_orders_by_op = True
-            op_qs = op_qs.filter(subevent_id=self.subevent_id)
-        elif e.has_subevents and (self.rule.date_is_absolute or self.rule.offset_relative_to_subevent):
-            if self.rule.subevent_id:
-                filter_orders_by_op = True
-                op_qs = op_qs.filter(subevent_id=self.rule.subevent_id)
-            else:
-                self.rule.sync_scheduled_mails()
-                raise ValueError("Scheduled mail for event series is missing its subevent assignment")
-        elif self.rule.subevent_id:
-            filter_orders_by_op = True
-            op_qs = op_qs.filter(subevent=self.rule.subevent_id)
+            op_qs = op_qs.filter(subevent=self.subevent)
+        elif e.has_subevents:
+            return  # This rule should not even exist
 
         if not self.rule.all_products:
             filter_orders_by_op = True
@@ -175,14 +170,58 @@ class ScheduledMail(models.Model):
         for o in orders:
             with language(o.locale, e.settings.region):
                 positions = list(o.positions.all())
-                o_sent = False
+                send_to_order = send_to_orders
 
                 try:
                     ia = o.invoice_address
                 except InvoiceAddress.DoesNotExist:
                     ia = InvoiceAddress(order=o)
 
-                if send_to_orders and o.email:
+                if send_to_attendees:
+                    parent_op = None
+                    sent_to_positions = set()
+                    for p in positions:
+                        if p.addon_to_id is None:
+                            # this op might have matching add-ons, so save for later
+                            parent_op = p
+                        elif not parent_op or p.addon_to_id != parent_op.id:
+                            # this op is an add-on, but not to the current parent_op
+                            # something got mixed up as add-ons should always come directly after their parent
+                            logger.warning(f"Add-ons are mixed up for position #{p.positionid} in order {o.full_code}")
+                            continue
+
+                        if p.id not in position_ids:
+                            # not a matching op, just there for parent_op
+                            continue
+
+                        if p.addon_to_id and (
+                            not p.attendee_email or p.attendee_email == parent_op.attendee_email
+                        ):
+                            # if op is addon and either has no mail or the same as parent => send to parent
+                            p = parent_op
+
+                        if p.pk in sent_to_positions:
+                            # this position already got an email
+                            continue
+
+                        if not p.attendee_email or p.attendee_email == o.email:
+                            # no email or same as order => send to order
+                            send_to_order = True
+                            continue
+
+                        email_ctx = get_email_context(
+                            event=e,
+                            order=o,
+                            invoice_address=ia,
+                            position=p,
+                            event_or_subevent=self.subevent or e,
+                        )
+                        p.send_mail(self.rule.subject, self.rule.template, email_ctx,
+                                    attach_ical=self.rule.attach_ical,
+                                    log_entry_type='pretix.plugins.sendmail.rule.order.position.email.sent')
+                        sent_to_positions.add(p.pk)
+
+                if send_to_order and o.email:
                     email_ctx = get_email_context(
                         event=e,
                         order=o,
@@ -192,44 +231,6 @@ class ScheduledMail(models.Model):
                     o.send_mail(self.rule.subject, self.rule.template, email_ctx,
                                 attach_ical=self.rule.attach_ical,
                                 log_entry_type='pretix.plugins.sendmail.rule.order.email.sent')
-                    o_sent = True
-
-                if send_to_attendees:
-                    if not self.rule.all_products:
-                        positions = [p for p in positions if p.item_id in limit_products]
-                    if self.subevent_id:
-                        positions = [p for p in positions if p.subevent_id == self.subevent_id]
-                    elif self.rule.subevent_id:
-                        positions = [p for p in positions if p.subevent_id == self.rule.subevent_id]
-
-                    seen_attendee_emails = set()
-                    for p in positions:
-                        if p.id in position_ids:
-                            if p.attendee_email and (p.attendee_email != o.email or not o_sent):
-                                if p.attendee_email in seen_attendee_emails:
-                                    continue
-                                seen_attendee_emails.add(p.attendee_email)
-                                email_ctx = get_email_context(
-                                    event=e,
-                                    order=o,
-                                    invoice_address=ia,
-                                    position=p,
-                                    event_or_subevent=self.subevent or e,
-                                )
-                                p.send_mail(self.rule.subject, self.rule.template, email_ctx,
-                                            attach_ical=self.rule.attach_ical,
-                                            log_entry_type='pretix.plugins.sendmail.rule.order.position.email.sent')
-                            elif not o_sent and o.email:
-                                email_ctx = get_email_context(
-                                    event=e,
-                                    order=o,
-                                    invoice_address=ia,
-                                    event_or_subevent=self.subevent or e,
-                                )
-                                o.send_mail(self.rule.subject, self.rule.template, email_ctx,
-                                            attach_ical=self.rule.attach_ical,
-                                            log_entry_type='pretix.plugins.sendmail.rule.order.email.sent')
-                                o_sent = True
 
                 self.last_successful_order_id = o.pk
 
@@ -288,14 +289,6 @@ class Rule(models.Model, LoggingMixin):
     date_is_absolute = models.BooleanField(default=True, blank=True)
     offset_to_event_end = models.BooleanField(default=False, blank=True)  # no verbose name because not actually
     offset_is_after = models.BooleanField(default=False, blank=True)  # displayed in any forms
-    offset_relative_to_subevent = models.BooleanField(
-        default=True,
-        verbose_name=_('Schedule relative to individual event dates'),
-        help_text=_(
-            'If enabled, a separate email is scheduled for each event date based on that date. '
-            'If disabled, one email is scheduled relative to the main event date.'
-        ),
-    )
 
     send_to = models.CharField(max_length=10, choices=SEND_TO_CHOICES, default=CUSTOMERS, verbose_name=_('Send email to'))
 
@@ -307,68 +300,32 @@ class Rule(models.Model, LoggingMixin):
 
     objects = ScopedManager(organizer='event__organizer')
 
-    def uses_per_subevent_scheduled_mails(self):
-        if not self.event.has_subevents or self.subevent_id:
-            return False
-        if self.date_is_absolute:
-            return True
-        return self.offset_relative_to_subevent
+    def save(self, **kwargs):
+        is_creation = not self.pk
+        super().save(**kwargs)
 
-    def sync_scheduled_mails(self, *, is_creation=False):
-        keep_states = [ScheduledMail.STATE_COMPLETED]
         create_sms = []
-
         if self.event.has_subevents:
-            if self.subevent_id:
-                sm, created = ScheduledMail.objects.get_or_create(
-                    rule=self, subevent_id=self.subevent_id, event=self.event,
-                )
-                if created or not sm.computed_datetime:
-                    sm.recompute()
-                    sm.save(update_fields=['computed_datetime', 'last_computed', 'state'])
-            elif not self.date_is_absolute and not self.offset_relative_to_subevent:
-                sm, created = ScheduledMail.objects.get_or_create(
-                    rule=self, subevent=None, event=self.event,
-                )
-                if created or not sm.computed_datetime:
-                    sm.recompute()
-                    sm.save(update_fields=['computed_datetime', 'last_computed', 'state'])
+            if self.subevent:
+                ScheduledMail.objects.get_or_create(rule=self, subevent=self.subevent, event=self.event)
             else:
                 for se in self.event.subevents.annotate(has_sm=Exists(ScheduledMail.objects.filter(
                         subevent=OuterRef('pk'), rule=self))).filter(has_sm=False):
                     sm = ScheduledMail(rule=self, subevent=se, event=self.event)
                     sm.recompute()
                     create_sms.append(sm)
-                if create_sms:
-                    ScheduledMail.objects.bulk_create(create_sms)
+            ScheduledMail.objects.bulk_create(create_sms)
         else:
-            sm, created = ScheduledMail.objects.get_or_create(
-                rule=self, subevent=None, event=self.event,
-            )
-            if created or not sm.computed_datetime:
-                sm.recompute()
-                sm.save(update_fields=['computed_datetime', 'last_computed', 'state'])
+            ScheduledMail.objects.get_or_create(rule=self, event=self.event)
 
         if not is_creation:
-            if self.event.has_subevents:
-                if self.subevent_id:
-                    ScheduledMail.objects.filter(
-                        Q(rule=self),
-                        ~Q(subevent_id=self.subevent_id),
-                        ~Q(state__in=keep_states)
-                    ).delete()
-                elif not self.date_is_absolute and not self.offset_relative_to_subevent:
-                    ScheduledMail.objects.filter(
-                        Q(rule=self),
-                        Q(subevent__isnull=False),
-                        ~Q(state__in=keep_states)
-                    ).delete()
-                else:
-                    ScheduledMail.objects.filter(
-                        Q(rule=self),
-                        Q(subevent__isnull=True),
-                        ~Q(state__in=keep_states)
-                    ).delete()
+            if self.subevent:
+                keep_states = [ScheduledMail.STATE_COMPLETED]  # we keep rules where mails have already been sent
+                ScheduledMail.objects.filter(
+                    Q(rule=self),
+                    ~Q(subevent=self.subevent),
+                    ~Q(state__in=keep_states)
+                ).delete()
 
             update_sms = []
             for sm in self.scheduledmail_set.prefetch_related('event').select_related('subevent'):
@@ -381,77 +338,49 @@ class Rule(models.Model, LoggingMixin):
 
             ScheduledMail.objects.bulk_update(update_sms, ['computed_datetime', 'last_computed', 'state'], 100)
 
-    def save(self, **kwargs):
-        is_creation = not self.pk
-        super().save(**kwargs)
-        self.sync_scheduled_mails(is_creation=is_creation)
-
     @property
     def human_readable_time(self):
         if self.date_is_absolute:
             d = self.send_date.astimezone(self.event.timezone)
             return _('on {date} at {time}').format(date=date_format(d, 'SHORT_DATE_FORMAT'),
                                                    time=date_format(d, 'TIME_FORMAT'))
-
-        per_date = (
-            self.event.has_subevents
-            and self.offset_relative_to_subevent
-            and not self.subevent
-        )
-        if self.offset_to_event_end:
-            if self.offset_is_after:
-                if per_date:
-                    s = ngettext(
-                        '%(count)d day after event date end at %(time)s',
-                        '%(count)d days after event date end at %(time)s',
-                        self.send_offset_days
-                    )
-                else:
+        else:
+            if self.offset_to_event_end:
+                if self.offset_is_after:
                     s = ngettext(
                         '%(count)d day after event end at %(time)s',
                         '%(count)d days after event end at %(time)s',
                         self.send_offset_days
-                    )
-            else:
-                if per_date:
-                    s = ngettext(
-                        '%(count)d day before event date end at %(time)s',
-                        '%(count)d days before event date end at %(time)s',
-                        self.send_offset_days
-                    )
+                    ) % {
+                        'count': self.send_offset_days,
+                        'time': date_format(self.send_offset_time, 'TIME_FORMAT')
+                    }
                 else:
                     s = ngettext(
                         '%(count)d day before event end at %(time)s',
                         '%(count)d days before event end at %(time)s',
                         self.send_offset_days
-                    )
-        elif self.offset_is_after:
-            if per_date:
-                s = ngettext(
-                    '%(count)d day after event date start at %(time)s',
-                    '%(count)d days after event date start at %(time)s',
-                    self.send_offset_days
-                )
+                    ) % {
+                        'count': self.send_offset_days,
+                        'time': date_format(self.send_offset_time, 'TIME_FORMAT')
+                    }
             else:
-                s = ngettext(
-                    '%(count)d day after event start at %(time)s',
-                    '%(count)d days after event start at %(time)s',
-                    self.send_offset_days
-                )
-        else:
-            if per_date:
-                s = ngettext(
-                    '%(count)d day before event date start at %(time)s',
-                    '%(count)d days before event date start at %(time)s',
-                    self.send_offset_days
-                )
-            else:
-                s = ngettext(
-                    '%(count)d day before event start at %(time)s',
-                    '%(count)d days before event start at %(time)s',
-                    self.send_offset_days
-                )
-        return s % {
-            'count': self.send_offset_days,
-            'time': date_format(self.send_offset_time, 'TIME_FORMAT')
-        }
+                if self.offset_is_after:
+                    s = ngettext(
+                        '%(count)d day after event start at %(time)s',
+                        '%(count)d days after event start at %(time)s',
+                        self.send_offset_days
+                    ) % {
+                        'count': self.send_offset_days,
+                        'time': date_format(self.send_offset_time, 'TIME_FORMAT')
+                    }
+                else:
+                    s = ngettext(
+                        '%(count)d day before event start at %(time)s',
+                        '%(count)d days before event start at %(time)s',
+                        self.send_offset_days
+                    ) % {
+                        'count': self.send_offset_days,
+                        'time': date_format(self.send_offset_time, 'TIME_FORMAT')
+                    }
+            return s
