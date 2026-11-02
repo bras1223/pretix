@@ -43,6 +43,7 @@ class PretixBaseConfig(AppConfig):
         from . import exporter  # NOQA
         from . import payment  # NOQA
         from . import exporters  # NOQA
+        from . import fonts  # NOQA
         from .invoicing import pdf, transmission, email, peppol, national  # NOQA
         from . import notifications  # NOQA
         from . import email  # NOQA

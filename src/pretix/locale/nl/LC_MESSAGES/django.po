@@ -777,8 +777,8 @@ msgstr "<a {a_attr}>mogelijk gemaakt door {name} gebaseerd op pretix</a>"
 
 #: pretix/base/context.py
 #, python-format
-msgid "<a %(a_attr)s>ticketing powered by pretix</a>"
-msgstr "<a %(a_attr)s>ticketverkoop mogelijk gemaakt door pretix</a>"
+msgid "<a %(a_attr)s>ticketing powered by Caught</a>"
+msgstr "<a %(a_attr)s>ticketverkoop mogelijk gemaakt door Caught</a>"
 
 #: pretix/base/context.py
 msgid "source code"
@@ -13503,8 +13503,8 @@ msgstr ""
 
 #: pretix/base/templates/pretixbase/email/email_footer.html
 #, python-format
-msgid "powered by <a %(a_attr)s>pretix</a>"
-msgstr "mogelijk gemaakt door <a %(a_attr)s>pretix</a>"
+msgid "powered by <a %(a_attr)s>Caught</a>"
+msgstr "mogelijk gemaakt door <a %(a_attr)s>Caught</a>"
 
 #: pretix/base/templates/pretixbase/email/export_failed.txt
 #, fuzzy
@@ -19149,10 +19149,10 @@ msgstr "Autoriseer een applicatie"
 #, python-format
 msgid ""
 "Do you really want to grant the application <strong>%(application)s</strong> "
-"access to your pretix account?"
+"access to your Caught Tickets account?"
 msgstr ""
 "Wilt u de applicatie <strong>%(application)s</strong> echt toegang geven tot "
-"uw pretix-account?"
+"uw Caught Tickets-account?"
 
 #: pretix/control/templates/pretixcontrol/auth/oauth_authorization.html
 #, python-format
@@ -19171,11 +19171,11 @@ msgstr ""
 
 #: pretix/control/templates/pretixcontrol/auth/oauth_authorization.html
 msgid ""
-"This application has <strong>not</strong> been reviewed by the pretix team. "
-"Granting access to your pretix account happens at your own risk."
+"This application has <strong>not</strong> been reviewed by the Caught Tickets team. "
+"Granting access to your Caught Tickets account happens at your own risk."
 msgstr ""
-"Deze applicatie is <strong>niet</strong> gecontroleerd door het pretix-team. "
-"U geeft deze applicatie op eigen risico toegang tot uw account."
+"Deze applicatie is <strong>niet</strong> gecontroleerd door het Caught Tickets-team. "
+"U geeft deze applicatie op eigen risico toegang tot uw Caught Tickets-account."
 
 #: pretix/control/templates/pretixcontrol/auth/oauth_authorization.html
 #: pretix/control/templates/pretixcontrol/checkin/bulk_revert_confirm.html
@@ -23739,8 +23739,8 @@ msgid "Permissions"
 msgstr "Machtigingen"
 
 #: pretix/control/templates/pretixcontrol/oauth/authorized.html
-msgid "No applications have access to your pretix account."
-msgstr "Geen enkele applicatie heeft toegang tot uw pretix-account."
+msgid "No applications have access to your Caught Tickets account."
+msgstr "Geen enkele applicatie heeft toegang tot uw Caught Tickets-account."
 
 #: pretix/control/templates/pretixcontrol/order/approve.html
 msgid "Approve order"
@@ -26668,13 +26668,13 @@ msgstr "stuur uitnodiging opnieuw"
 #: pretix/control/templates/pretixcontrol/organizers/team_members.html
 msgid ""
 "To add a new user, you can enter their email address here. If they already "
-"have a pretix account, they will immediately be added to the event. "
+"have a Caught Tickets account, they will immediately be added to the event. "
 "Otherwise, they will be sent an email with an invitation."
 msgstr ""
 "Om een nieuwe gebruiker toe te voegen kunt u hier diens e-mailadres "
-"invoeren. Als de gebruiker al een pretix-account heeft, zal de gebruiker "
-"direct aan het evenement worden toegevoegd. Anders krijgt de gebruiker een "
-"mail met een uitnodiging."
+"invoeren. Als de gebruiker al een Caught Tickets-account heeft, zal de "
+"gebruiker direct aan het evenement worden toegevoegd. Anders krijgt de "
+"gebruiker een mail met een uitnodiging."
 
 #: pretix/control/templates/pretixcontrol/organizers/team_members.html
 msgid "Add"
@@ -30029,9 +30029,9 @@ msgid "The token has been revoked."
 msgstr "Het token is ingetrokken."
 
 #: pretix/control/views/organizer.py
-msgid "Users need to have a pretix account before they can be invited."
+msgid "Users need to have a Caught Tickets account before they can be invited."
 msgstr ""
-"Gebruikers moeten een pretix-account hebben voordat ze kunnen worden "
+"Gebruikers moeten een Caught Tickets-account hebben voordat ze kunnen worden "
 "uitgenodigd."
 
 #: pretix/control/views/organizer.py
@@ -36934,21 +36934,21 @@ msgid "Hello!"
 msgstr "Hallo!"
 
 #: pretix/presale/templates/pretixpresale/index.html
-#, python-format
-msgid ""
-"This is a self-hosted installation of <a %(a_attr)s>pretix, your free and "
-"open source ticket sales software</a>."
-msgstr ""
-"Dit is een zelfgehoste installatie van <a %(a_attr)s=\"\">pretix, uw gratis "
-"en opensourcesoftware voor ticketverkoop</a>."
-
-#: pretix/presale/templates/pretixpresale/index.html
 msgid ""
 "If you're looking to buy a ticket, you need to follow a direct link to an "
 "event or organizer profile."
 msgstr ""
-"Als u een ticket wilt kopen, moet u een directe link naar een evenement of "
-"het profiel van een organisator volgen."
+"Om een ticket te kopen volgt u een directe link naar het profiel van een "
+"evenement of organisator."
+
+#: pretix/presale/templates/pretixpresale/index.html
+#, python-format
+msgid ""
+"Looking to sell tickets online at a low rate? Get in touch via "
+"<a %(a_attr)s>https://caught.nu/contact/</a>."
+msgstr ""
+"Zelf online tickets verkopen tegen een laag tarief? Neem contact op via: "
+"<a %(a_attr)s>https://caught.nu/contact/</a>."
 
 #: pretix/presale/templates/pretixpresale/index.html
 #, python-format

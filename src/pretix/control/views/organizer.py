@@ -1135,7 +1135,7 @@ class TeamMemberView(OrganizerDetailViewMixin, OrganizerPermissionRequiredMixin,
                     messages.error(self.request, _('This user already has been invited for this team.'))
                     return self.get(request, *args, **kwargs)
                 if 'native' not in get_auth_backends():
-                    messages.error(self.request, _('Users need to have a pretix account before they can be invited.'))
+                    messages.error(self.request, _('Users need to have a Caught Tickets account before they can be invited.'))
                     return self.get(request, *args, **kwargs)
 
                 invite = self.object.invites.create(email=self.add_form.cleaned_data['user'])

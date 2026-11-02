@@ -55,9 +55,9 @@ def get_powered_by(request, safelink=True):
                 ))
             )
     else:
-        msg = gettext('<a %(a_attr)s>ticketing powered by pretix</a>') % {
+        msg = gettext('<a %(a_attr)s>ticketing powered by Caught</a>') % {
             'a_attr': 'href="{}" target="_blank" rel="noopener"'.format(
-                sl('https://pretix.eu') if safelink else 'https://pretix.eu',
+                sl('https://caught.nu') if safelink else 'https://caught.nu',
             )
         }
 
@@ -77,7 +77,7 @@ def contextprocessor(request):
     try:
         ctx['poweredby'] = get_powered_by(request, safelink=True)
     except Exception:
-        ctx['poweredby'] = '<a href="https://pretix.eu/" target="_blank" rel="noopener">powered by pretix</a>'
+        ctx['poweredby'] = '<a href="https://caught.nu/" target="_blank" rel="noopener">powered by Caught</a>'
     if settings.DEBUG and 'runserver' not in sys.argv:
         ctx['debug_warning'] = True
     elif 'runserver' in sys.argv:
