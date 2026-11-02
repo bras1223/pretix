@@ -159,6 +159,17 @@ DEFAULTS = {
         'serializer_class': serializers.MultipleChoiceField,
         'form_kwargs': lambda: restricted_plugin_kwargs(),
     },
+    # Caught: enable order-level questions for all events by default
+    'feature_flag_order_level_questions': {
+        'default': 'True',
+        'type': bool,
+        'form_class': forms.BooleanField,
+        'serializer_class': serializers.BooleanField,
+        'form_kwargs': dict(
+            label=_("Enable order-level questions"),
+            help_text=_("Allow questions that are asked once per order instead of once per ticket."),
+        ),
+    },
     'customer_accounts': {
         'default': 'False',
         'type': bool,

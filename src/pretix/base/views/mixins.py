@@ -74,6 +74,7 @@ class BaseQuestionsViewMixin:
             prefix='order',
             request=self.request,
             container=container,
+            positions=self._positions_for_questions,
             all_optional=self.all_optional,
             data=(self.request.POST if self.request.method == 'POST' else None),
             files=(self.request.FILES if self.request.method == 'POST' else None),

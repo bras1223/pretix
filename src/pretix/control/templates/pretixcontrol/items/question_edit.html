@@ -27,6 +27,10 @@
                 {% if form.items %}
                     {% bootstrap_field form.items layout="control" %}
                 {% endif %}
+                {% if form.condition_item %}
+                    {% bootstrap_field form.condition_item layout="control" %}
+                    {% bootstrap_field form.condition_min_count layout="control" %}
+                {% endif %}
                 {% bootstrap_field form.required layout="control" %}
                 <div class="alert alert-info alert-required-boolean">
                     {% blocktrans trimmed %}

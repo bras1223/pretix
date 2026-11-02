@@ -156,6 +156,14 @@
                                 {{ q.question }}
                             </strong><br>
                             <small class="text-muted">{{ q.identifier }}</small>
+                            {% if q.condition_item %}
+                                <br>
+                                <small class="text-muted">
+                                    {% blocktrans trimmed with product=q.condition_item.name count=q.condition_min_count %}
+                                        Only if at least {{ count }}× {{ product }}
+                                    {% endblocktrans %}
+                                </small>
+                            {% endif %}
                         </td>
                         <td>
                             {% if q.pk %}

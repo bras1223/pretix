@@ -5827,10 +5827,8 @@ msgstr "Landcode (ISO 3166-1 alpha-2)"
 
 #: pretix/base/models/items.py
 #, fuzzy
-#| msgctxt "attendee_data"
-#| msgid "Asked"
 msgid "Asked on"
-msgstr "Gevraagd"
+msgstr "Gesteld bij"
 
 #: pretix/base/models/items.py pretix/base/models/organizer.py
 msgid ""
@@ -23399,28 +23397,24 @@ msgstr ""
 "hun dieetwensen."
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
-#, fuzzy
-#| msgid "Create a new question"
 msgid "Create a new per-ticket question"
-msgstr "Nieuwe vraag aanmaken"
+msgstr "Nieuwe ticketvraag aanmaken"
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
-#, fuzzy
-#| msgid "Create a new question"
 msgid "Create a new order-level question"
-msgstr "Nieuwe vraag aanmaken"
+msgstr "Nieuwe bestellingsvraag aanmaken"
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
-#, fuzzy
-#| msgid "Delete question"
 msgid "Per-ticket questions"
-msgstr "Vraag verwijderen"
+msgstr "Ticketvragen"
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
 msgid ""
 "These questions are asked for every ticket, so possibly multiple times in "
 "the same order."
 msgstr ""
+"Deze vragen worden per ticket gesteld, dus mogelijk meerdere keren in "
+"dezelfde bestelling."
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
 msgid "Create a new question"
@@ -23439,28 +23433,28 @@ msgid "All personalized products"
 msgstr "Alle gepersonaliseerde producten"
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
-#, fuzzy
-#| msgid "Include questions"
 msgid "Per-order questions"
-msgstr "Inclusief vragen"
+msgstr "Bestellingsvragen"
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
 msgid ""
 "This functionality is in active development and expected to change "
 "significantly over the coming months."
 msgstr ""
+"Deze functionaliteit is in actieve ontwikkeling en zal naar verwachting de "
+"komende maanden nog sterk wijzigen."
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
 msgid ""
 "Per-order questions are currently not supported and will not be displayed in "
 "pretixPOS."
 msgstr ""
+"Bestellingsvragen worden momenteel niet ondersteund en niet getoond in "
+"pretixPOS."
 
 #: pretix/control/templates/pretixcontrol/items/questions.html
-#, fuzzy
-#| msgid "The question has been reordered."
 msgid "These questions are asked once per order."
-msgstr "De sortering van de vraag is aangepast."
+msgstr "Deze vragen worden één keer per bestelling gesteld."
 
 #: pretix/control/templates/pretixcontrol/items/quota.html
 #: pretix/control/templates/pretixcontrol/items/quota_edit.html
@@ -37664,6 +37658,52 @@ msgid "Kosovo"
 msgstr "Kosovo"
 
 # Caught-specific features
+#: pretix/base/settings.py
+msgid "Enable order-level questions"
+msgstr "Order-vragen inschakelen"
+
+#: pretix/base/settings.py
+msgid "Allow questions that are asked once per order instead of once per ticket."
+msgstr "Sta vragen toe die één keer per bestelling worden gesteld in plaats van per ticket."
+
+#: pretix/base/models/items.py
+msgid "Only ask if this product is ordered"
+msgstr "Alleen vragen als dit product is besteld"
+
+#: pretix/base/models/items.py
+msgid ""
+"Leave empty to always ask this order-level question. If set, the question is only shown when "
+"the selected product is in the order at least as often as the minimum quantity below."
+msgstr ""
+"Laat leeg om deze bestellingsvraag altijd te stellen. Indien ingesteld wordt de vraag alleen "
+"getoond als het geselecteerde product minstens zo vaak in de bestelling zit als het "
+"minimumaantal hieronder."
+
+#: pretix/base/models/items.py
+msgid "Minimum quantity of that product"
+msgstr "Minimumaantal van dat product"
+
+#: pretix/base/models/items.py
+msgid ""
+"Only applies when a product is selected above. Example: set to 5 to ask the question only when "
+"that product is ordered at least 5 times."
+msgstr ""
+"Geldt alleen als hierboven een product is geselecteerd. Voorbeeld: zet op 5 om de vraag alleen "
+"te stellen als dat product minstens 5 keer is besteld."
+
+#: pretix/control/forms/item.py
+msgid "— Always ask (no product condition) —"
+msgstr "— Altijd vragen (geen productvoorwaarde) —"
+
+#: pretix/control/forms/item.py
+msgid "Enter a number of at least 1."
+msgstr "Voer een getal van minstens 1 in."
+
+#: pretix/control/templates/pretixcontrol/items/questions.html
+#, python-format
+msgid "Only if at least %(count)s× %(product)s"
+msgstr "Alleen bij minstens %(count)s× %(product)s"
+
 #: pretix/base/models/vouchers.py
 msgid "Display only (no purchase)"
 msgstr "Alleen weergeven (geen aankoop)"

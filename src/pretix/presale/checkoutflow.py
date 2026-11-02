@@ -1150,6 +1150,27 @@ class QuestionsStep(CartQuestionsViewMixin, CartMixin, TemplateFlowStep):
                 for key, value in response.items():
                     if value.required and not form_data.get(key):
                         return False
+
+        if not self.all_optional and self.checkout_session:
+            from pretix.base.models.items import Question
+            order_answers = {
+                aw.question_id: aw for aw in self.checkout_session.answers.all()
+            }
+            for q in Question.objects.filter(
+                event=self.request.event,
+                container_type=Question.ContainerType.ORDER,
+                ask_during_checkin=False,
+                hidden=False,
+                required=True,
+            ).select_related('condition_item'):
+                if not q.applies_to_positions(self._positions_for_questions):
+                    continue
+                if q.dependency_question_id:
+                    continue  # dependency visibility is validated on form submit
+                if q.id not in order_answers:
+                    if warn:
+                        messages.warning(request, _('Please fill in answers to all required questions.'))
+                    return False
         return True
 
     def get_context_data(self, **kwargs):

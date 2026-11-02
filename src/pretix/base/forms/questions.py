@@ -982,20 +982,26 @@ class OrderLevelQuestionsForm(BaseQuestionsForm):
         :param checkoutsession: The checkout session the form should be for
         :param order: The order the form should be for
         :param event: The event this belongs to
+        :param positions: Cart/order positions used to evaluate product quantity conditions
         """
         request = kwargs.pop('request', None)
         event = kwargs.pop('event')
         self.all_optional = kwargs.pop('all_optional', False)
+        positions = kwargs.pop('positions', None)
+        if positions is None:
+            positions = []
 
         super().__init__(*args, **kwargs)
 
         questions = Question.objects.filter(
             event=event, container_type=Question.ContainerType.ORDER,
             ask_during_checkin=False, hidden=False,
-        ).order_by('position')
+        ).select_related('condition_item').order_by('position')
         answerlist = container.answers.prefetch_related('options')
 
         for q in questions:
+            if not q.applies_to_positions(positions):
+                continue
             self.fields['question_%s' % q.id] = self.build_user_question_field(request, event, answerlist, q)
 
     def clean(self):

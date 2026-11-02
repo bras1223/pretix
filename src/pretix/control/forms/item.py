@@ -156,11 +156,17 @@ class QuestionForm(I18nModelForm):
         if self.instance.container_type == Question.ContainerType.ORDERPOSITION:
             self.fields['items'].queryset = self.instance.event.items.all()
             self.fields['items'].required = True
+            del self.fields['condition_item']
+            del self.fields['condition_min_count']
         else:
             del self.fields['items']
             del self.fields['ask_during_checkin']
             del self.fields['show_during_checkin']
             del self.fields['print_on_invoice']
+            self.fields['condition_item'].queryset = self.instance.event.items.all()
+            self.fields['condition_item'].required = False
+            self.fields['condition_item'].empty_label = _('— Always ask (no product condition) —')
+            self.fields['condition_min_count'].widget.attrs['min'] = 1
         self.fields['dependency_question'].widget.attrs['data-container-type'] = self.instance.container_type
         self.fields['dependency_question'].queryset = self.instance.event.questions.filter(
             type__in=(Question.TYPE_BOOLEAN, Question.TYPE_CHOICE, Question.TYPE_CHOICE_MULTIPLE),
@@ -226,6 +232,13 @@ class QuestionForm(I18nModelForm):
             raise ValidationError({'dependency_values': [_('This field is required')]})
         if d.get('dependency_question') and d.get('ask_during_checkin'):
             raise ValidationError(_('Dependencies between questions are not supported during check-in.'))
+        if self.instance.container_type == Question.ContainerType.ORDER:
+            if d.get('condition_item') and not d.get('condition_min_count'):
+                d['condition_min_count'] = 1
+            if not d.get('condition_item'):
+                d['condition_min_count'] = 1
+            elif d.get('condition_min_count', 0) < 1:
+                raise ValidationError({'condition_min_count': [_('Enter a number of at least 1.')]})
         return d
 
     class Meta:
@@ -242,6 +255,8 @@ class QuestionForm(I18nModelForm):
             'unique',
             'identifier',
             'items',
+            'condition_item',
+            'condition_min_count',
             'dependency_question',
             'dependency_values',
             'print_on_invoice',
@@ -265,12 +280,14 @@ class QuestionForm(I18nModelForm):
             ),
             'dependency_values': forms.SelectMultiple,
             'help_text': I18nMarkdownTextarea,
+            'condition_min_count': forms.NumberInput(attrs={'min': 1}),
         }
         field_classes = {
             'valid_datetime_min': SplitDateTimeField,
             'valid_datetime_max': SplitDateTimeField,
             'items': ItemMultipleChoiceField,
             'dependency_question': SafeModelChoiceField,
+            'condition_item': SafeModelChoiceField,
         }
 
 

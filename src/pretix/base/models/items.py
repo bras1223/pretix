@@ -1722,6 +1722,22 @@ class Question(LoggedModel):
         'Question', null=True, blank=True, on_delete=models.SET_NULL, related_name='dependent_questions'
     )
     dependency_values = MultiStringField(default=[])
+    condition_item = models.ForeignKey(
+        'Item',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='conditioned_order_questions',
+        verbose_name=_('Only ask if this product is ordered'),
+        help_text=_('Leave empty to always ask this order-level question. If set, the question is only shown when '
+                    'the selected product is in the order at least as often as the minimum quantity below.'),
+    )
+    condition_min_count = models.PositiveIntegerField(
+        default=1,
+        verbose_name=_('Minimum quantity of that product'),
+        help_text=_('Only applies when a product is selected above. Example: set to 5 to ask the question only when '
+                    'that product is ordered at least 5 times.'),
+    )
     valid_number_min = models.DecimalField(decimal_places=6, max_digits=30, null=True, blank=True,
                                            verbose_name=_('Minimum value'),
                                            help_text=_('Currently not supported in our apps and during check-in'))
@@ -1804,6 +1820,18 @@ class Question(LoggedModel):
 
     def __lt__(self, other) -> bool:
         return self.sortkey < other.sortkey
+
+    def applies_to_positions(self, positions) -> bool:
+        """
+        Whether this order-level question should be asked for the given cart/order positions.
+        Per-ticket questions always apply (product filtering happens elsewhere).
+        """
+        if self.container_type != self.ContainerType.ORDER:
+            return True
+        if not self.condition_item_id:
+            return True
+        count = sum(1 for p in positions if p.item_id == self.condition_item_id)
+        return count >= max(1, self.condition_min_count or 1)
 
     def clean_answer(self, answer):
         if self.required:

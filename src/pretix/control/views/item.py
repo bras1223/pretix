@@ -437,7 +437,7 @@ class QuestionList(ListView):
     template_name = 'pretixcontrol/items/questions.html'
 
     def get_queryset(self):
-        return self.request.event.questions.prefetch_related('items')
+        return self.request.event.questions.select_related('condition_item').prefetch_related('items')
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
