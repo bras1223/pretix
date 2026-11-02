@@ -24065,10 +24065,8 @@ msgstr "(optioneel)"
 #: pretix/presale/templates/pretixpresale/event/checkout_confirm.html
 #: pretix/presale/templates/pretixpresale/event/checkout_questions.html
 #: pretix/presale/templates/pretixpresale/event/order_modify.html
-#, fuzzy
-#| msgid "Additional information"
 msgid "Additional order information"
-msgstr "Extra informatie"
+msgstr "Aanvullende bestellingsinformatie"
 
 #: pretix/control/templates/pretixcontrol/order/delete.html
 msgid "Delete order"
