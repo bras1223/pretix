@@ -36,7 +36,9 @@ const dayAvailability = computed(() => {
 	return { best, allLow }
 })
 
-const dayOpenable = computed(() => !!dayAvailability.value && dayAvailability.value.best !== 'red')
+// Any day with events is openable (including sold out), so users can still
+// open a single sold-out subevent day and see the sold-out status.
+const dayOpenable = computed(() => !!dayAvailability.value)
 
 const role = computed(() => !props.day || !props.day.events.length || !props.mobile || !dayOpenable.value ? 'cell' : 'button')
 
@@ -50,9 +52,6 @@ const classObject = computed(() => {
 		if (dayAvailability.value.best === 'green' && dayAvailability.value.allLow) {
 			o['pretix-widget-day-availability-low'] = true
 		}
-		if (!dayOpenable.value) {
-			o['pretix-widget-day-not-openable'] = true
-		}
 	}
 	return o
 })
@@ -63,10 +62,13 @@ function selectDay (e: Event) {
 	e.stopPropagation()
 
 	// TODO decopypasta
-	// Display-only events are not navigable to the shop; show the list detail view instead
-	// (same as multi-event days) so a single subevent day remains viewable.
+	// Display-only / sold-out singles are not taken straight into the shop;
+	// show the list detail view so the day stays viewable (incl. "Sold out").
 	const ev = props.day.events[0]
-	if (props.day.events.length === 1 && ev.clickable !== false) {
+	const openShopDirectly = props.day.events.length === 1
+		&& ev.clickable !== false
+		&& dayAvailability.value?.best !== 'red'
+	if (openShopDirectly) {
 		store.parentStack.push(store.targetUrl)
 		store.targetUrl = ev.event_url
 		store.error = null
