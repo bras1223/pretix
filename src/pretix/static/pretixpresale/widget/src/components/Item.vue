@@ -20,6 +20,7 @@ const variations = ref<HTMLDivElement>()
 
 const classObject = computed(() => ({
 	'pretix-widget-item': true,
+	'pretix-widget-item-card': true,
 	'pretix-widget-item-with-picture': !!props.item.picture,
 	'pretix-widget-item-with-variations': props.item.has_variations,
 }))

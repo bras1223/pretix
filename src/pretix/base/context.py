@@ -31,31 +31,39 @@ from pretix.base.settings import GlobalSettingsObject
 from pretix.base.templatetags.safelink import safelink as sl
 
 
-def get_powered_by(request, safelink=True):
+def get_powered_by(request, safelink=True, compact=False):
     gs = GlobalSettingsObject()
     d = gs.settings.license_check_input
+    name = d.get('poweredby_name') or 'Caught'
+    name_href = d.get('poweredby_url') or 'https://caught.nu'
+    pretix_href = sl('https://pretix.eu') if safelink else 'https://pretix.eu'
+    name_href_attr = escape(sl(name_href)) if safelink else escape(name_href)
+
+    if compact:
+        # Widget footer: short Caught attribution only
+        msg = format_html(
+            gettext('<a {a_attr}>powered by {name}</a>'),
+            name=name,
+            a_attr=mark_safe(f'href="{name_href_attr}" target="_blank" rel="noopener"'),
+        )
+        return mark_safe(msg)
+
     if d.get('poweredby_name'):
         if d.get('poweredby_url'):
             msg = format_html(
                 gettext('<a {a_name_attr}>powered by {name}</a> <a {a_attr}>based on pretix</a>'),
                 name=d['poweredby_name'],
-                a_name_attr=mark_safe('href="{}" target="_blank" rel="noopener"'.format(
-                    escape(sl(d['poweredby_url'])) if safelink else escape(d['poweredby_url']),
-                )),
-                a_attr=mark_safe('href="{}" target="_blank" rel="noopener"'.format(
-                    sl('https://pretix.eu') if safelink else 'https://pretix.eu',
-                ))
+                a_name_attr=mark_safe(f'href="{name_href_attr}" target="_blank" rel="noopener"'),
+                a_attr=mark_safe(f'href="{pretix_href}" target="_blank" rel="noopener"'),
             )
         else:
             msg = format_html(
                 gettext('<a {a_attr}>powered by {name} based on pretix</a>'),
                 name=d['poweredby_name'],
-                a_attr=mark_safe('href="{}" target="_blank" rel="noopener"'.format(
-                    sl('https://pretix.eu') if safelink else 'https://pretix.eu',
-                ))
+                a_attr=mark_safe(f'href="{pretix_href}" target="_blank" rel="noopener"'),
             )
     else:
-        msg = gettext('<a %(a_attr)s>ticketing powered by Caught</a>') % {
+        msg = gettext('<a %(a_attr)s>powered by Caught</a>') % {
             'a_attr': 'href="{}" target="_blank" rel="noopener"'.format(
                 sl('https://caught.nu') if safelink else 'https://caught.nu',
             )

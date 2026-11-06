@@ -36,7 +36,7 @@
                     – {{ line.variation }}
                 {% endif %}
                 </p>
-                {% if line.seat or line.voucher or line.subevent or line.used_membership or line.blocked or line.valid_from or line.valid_until %}
+                {% if line.seat or line.voucher or line.used_membership or line.blocked or line.valid_from or line.valid_until or line.subevent and not line.addon_to or line.subevent and line.addon_to.subevent_id != line.subevent_id %}
                     <dl class="dl-inline">
                 {% elif event.settings.show_checkin_number_user and line.checkin_count %}
                     <dl class="dl-inline">
@@ -63,6 +63,7 @@
                     </div>
                 {% endif %}
                 {% if line.subevent %}
+                    {% if not line.addon_to or line.addon_to.subevent_id != line.subevent_id %}
                     <div class="cart-icon-details">
                         <dt class="sr-only">{% trans "Date:" context "subevent" %}</dt>
                         <dd>
@@ -80,7 +81,6 @@
                         </dd>
                     </div>
                     {% if line.subevent.location %}
-                    {% if not line.addon_to or line.addon_to.subevent_id != line.subevent_id %}
                     <div class="cart-icon-details">
                         <dt class="sr-only">{% trans "Location:" %}</dt>
                         <dd>
@@ -146,7 +146,7 @@
                         </dd>
                     </div>
                 {% endif %}
-                {% if line.seat or line.voucher or line.subevent or line.used_membership or line.blocked or line.valid_from or line.valid_until %}
+                {% if line.seat or line.voucher or line.used_membership or line.blocked or line.valid_from or line.valid_until or line.subevent and not line.addon_to or line.subevent and line.addon_to.subevent_id != line.subevent_id %}
                     </dl>
                 {% elif event.settings.show_checkin_number_user and line.checkin_count %}
                     </dl>

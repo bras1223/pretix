@@ -1,9 +1,17 @@
+.checkout-page-title {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
 .checkout-flow {
   display: flex;
   flex-direction: row;
-  margin: 15px 0 13px 0;
-  padding: 0;
+  margin: 0 0 1.5rem;
+  padding: 0.85rem 1rem;
   list-style: none;
+  background: var(--pretix-surface-muted);
+  border: 1px solid var(--pretix-border);
+  border-radius: var(--pretix-radius-card);
 
   .checkout-step {
     flex: 1;
@@ -12,21 +20,23 @@
     position: relative;
 
     .checkout-step-icon {
-      border: 1px solid $text-muted;
+      border: 1px solid var(--pretix-border);
       display: inline-block;
-      width: 30px;
-      height: 30px;
-      line-height: 28px;
-      border-radius: 15px;
+      width: 32px;
+      height: 32px;
+      line-height: 30px;
+      border-radius: 50%;
       color: $text-muted;
       z-index: 200;
-      background: white;
+      background: var(--pretix-surface);
       position: relative;
+      font-weight: 600;
     }
 
     .checkout-step-label {
       padding-top: 10px;
       color: $text-muted;
+      font-size: 0.92em;
     }
     a .checkout-step-label {
       color: $brand-primary;
@@ -36,11 +46,11 @@
       content: "";
       display: block;
       position: absolute;
-      top: 22px;
+      top: 24px;
       left: 0;
       width: 50%;
-      height: 6px;
-      background: $gray-lighter;
+      height: 3px;
+      background: var(--pretix-border);
       z-index: 100;
     }
     &:after {
@@ -70,9 +80,11 @@
       border: 1px solid $brand-primary;
       background: $brand-primary;
       color: white;
+      box-shadow: 0 0 0 4px var(--pretix-brand-primary-tint-90);
     }
     &.step-current .checkout-step-label {
       color: $brand-primary;
+      font-weight: 600;
     }
 
     &:hover, &:active {
@@ -82,6 +94,13 @@
   a {
     text-decoration: none;
   }
+}
+
+.checkout-layout main > .panel,
+.checkout-layout main .panel-group > .panel {
+  border-radius: var(--pretix-radius-card);
+  border-color: var(--pretix-border);
+  box-shadow: var(--pretix-shadow-soft);
 }
 @media(max-width: $screen-sm-max) {
   .checkout-step-label {

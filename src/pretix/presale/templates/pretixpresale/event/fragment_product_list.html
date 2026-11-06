@@ -127,12 +127,21 @@
                                         {{ var }}
                                         {% if cart.itemvarsums|getitem:var %}
                                             <span class="textbubble-success">
-                                                {% icon "shopping-cart" %}
-                                                {% blocktrans trimmed count amount=cart.itemvarsums|getitem:var %}
-                                                    {{ amount }}× in your cart
-                                                {% plural %}
-                                                    {{ amount }}× in your cart
-                                                {% endblocktrans %}
+                                                {% if request.event.is_form %}
+                                                    {% icon "check" %}
+                                                    {% blocktrans trimmed count amount=cart.itemvarsums|getitem:var %}
+                                                        {{ amount }}× in your registration
+                                                    {% plural %}
+                                                        {{ amount }}× in your registration
+                                                    {% endblocktrans %}
+                                                {% else %}
+                                                    {% icon "shopping-cart" %}
+                                                    {% blocktrans trimmed count amount=cart.itemvarsums|getitem:var %}
+                                                        {{ amount }}× in your cart
+                                                    {% plural %}
+                                                        {{ amount }}× in your cart
+                                                    {% endblocktrans %}
+                                                {% endif %}
                                             </span>
                                         {% endif %}
                                     </h{{ headline_level|default:3|add:2 }}>
@@ -256,7 +265,7 @@
                                                     <legend class="sr-only">{% trans "Quantity" %}</legend>
                                                     <button type="button" data-step="-1" data-controls="{{ form_prefix }}variation_{{ item.id }}_{{ var.id }}" class="btn btn-default input-item-count-dec" aria-label="- {{ item }}, {{ var }}: {% trans "Decrease quantity" %}"
                                                         {% if not ev.presale_is_running %}disabled{% endif %}>-</button>
-                                                    <input type="number" class="form-control input-item-count" placeholder="0" min="0"
+                                                    <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-control input-item-count" placeholder="0" min="0"
                                                         {% if not ev.presale_is_running %}disabled{% endif %}
                                                             {% if item.free_price %}
                                                             data-checked-onchange="price-variation-{{ item.pk }}-{{ var.pk }}"
@@ -301,12 +310,21 @@
                                 {{ item.name }}
                                 {% if cart.itemvarsums|getitem:item %}
                                     <span class="textbubble-success">
-                                        {% icon "shopping-cart" %}
-                                        {% blocktrans trimmed count amount=cart.itemvarsums|getitem:item %}
-                                            {{ amount }}× in your cart
-                                        {% plural %}
-                                            {{ amount }}× in your cart
-                                        {% endblocktrans %}
+                                        {% if request.event.is_form %}
+                                            {% icon "check" %}
+                                            {% blocktrans trimmed count amount=cart.itemvarsums|getitem:item %}
+                                                {{ amount }}× in your registration
+                                            {% plural %}
+                                                {{ amount }}× in your registration
+                                            {% endblocktrans %}
+                                        {% else %}
+                                            {% icon "shopping-cart" %}
+                                            {% blocktrans trimmed count amount=cart.itemvarsums|getitem:item %}
+                                                {{ amount }}× in your cart
+                                            {% plural %}
+                                                {{ amount }}× in your cart
+                                            {% endblocktrans %}
+                                        {% endif %}
                                     </span>
                                 {% endif %}
                             </h{{ headline_level|default:3|add:1 }}>
@@ -436,7 +454,7 @@
                                         <legend class="sr-only">{% trans "Quantity" %}</legend>
                                         <button type="button" data-step="-1" data-controls="{{ form_prefix }}item_{{ item.id }}" class="btn btn-default input-item-count-dec" aria-label="- {{ item }}: {% trans "Decrease quantity" %}"
                                             {% if not ev.presale_is_running %}disabled{% endif %}>-</button>
-                                        <input type="number" class="form-control input-item-count" placeholder="0" min="0"
+                                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-control input-item-count" placeholder="0" min="0"
                                             {% if not ev.presale_is_running %}disabled{% endif %}
                                             {% if itemnum == 1 %}value="1"{% endif %}
                                                 {% if item.free_price %}

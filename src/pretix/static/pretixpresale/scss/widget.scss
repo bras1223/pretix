@@ -257,36 +257,82 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
   }
 
   .pretix-widget-item-title {
-    font-weight: bold;
+    font-weight: 600;
+  }
+
+  .pretix-widget-item {
+    background: var(--pretix-surface, #fff);
+    border: 1px solid var(--pretix-border, #e4e7ec);
+    border-radius: var(--pretix-radius-card, 16px);
+    box-shadow: none;
+    margin: 0 0 0.85rem;
+    overflow: hidden;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      border-color: var(--pretix-border-strong, #cfd4dc);
+      box-shadow: var(--pretix-shadow-soft, none);
+    }
+  }
+
+  .pretix-widget-item-with-variations > .pretix-widget-main-item-row {
+    border-bottom: 1px solid var(--pretix-border, #d9dee3);
+    border-radius: 0;
+    margin: 0;
+    box-shadow: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
   }
 
   .pretix-widget-item-row {
-    padding: 10px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 8rem) minmax(7rem, 10rem);
+    gap: 0.75rem 1rem;
+    align-items: center;
+    padding: 1rem 1.15rem;
+    margin: 0;
+  }
+
+  .pretix-widget-item-variations {
+    background: var(--pretix-surface-muted, #f5f6f8);
+    padding: 0.5rem 0.65rem 0.65rem;
+  }
+
+  .pretix-widget-item-variations .pretix-widget-item-row {
+    background: var(--pretix-surface, #fff);
+    border: 1px solid transparent;
+    border-radius: var(--pretix-radius-control, 8px);
+    margin-bottom: 0.5rem;
+    box-shadow: none;
   }
 
   .pretix-widget-category {
-    margin: 10px 0;
+    margin: 0.75rem 0 1.25rem;
   }
 
   .pretix-widget-category-description {
-    padding: 0 15px;
+    padding: 0 4px;
   }
 
   .pretix-widget-category-name {
-    margin: 10px 0 0 0;
+    margin: 0.5rem 0 0.85rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   .pretix-widget-item-info-col {
-    width: 50%;
-    float: left;
-    padding: 0 15px;
+    width: auto;
+    float: none;
+    padding: 0;
     box-sizing: border-box;
+    min-width: 0;
   }
 
   .pretix-widget-item-price-col, .pretix-widget-item-availability-col {
-    width: 25%;
-    float: left;
-    padding: 0 15px;
+    width: auto;
+    float: none;
+    padding: 0;
     box-sizing: border-box;
   }
 
@@ -321,13 +367,9 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
   }
 
   .pretix-widget-item-count-group {
-    display: flex;
-  }
-
-  .pretix-widget-item-count-group input {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
+    display: inline-flex;
+    align-items: stretch;
+    min-width: 8rem;
   }
 
   .pretix-widget-item-count-group button span {
@@ -350,10 +392,12 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
 
   .pretix-widget-item-count-multiple {
     display: block;
-    width: 100%;
+    width: 2.9rem;
+    flex: 1 1 auto;
     box-sizing: border-box;
-    padding: 5px;
+    padding: 0;
     text-align: center;
+    line-height: normal;
   }
 
   .pretix-widget-pricebox-price-input {
@@ -370,30 +414,114 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
   }
 
   .pretix-widget-attribution {
-    padding: 10px 15px;
+    display: block;
+    clear: both;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 12px 0;
     text-align: center;
     font-size: 12px;
+
+    a {
+      display: inline-block;
+      float: none;
+    }
   }
 
   .pretix-widget-item-picture-link {
     width: 60px;
     height: 60px;
-    margin-right: 10px;
+    margin-right: 12px;
     float: left;
   }
   .pretix-widget-item-picture {
     max-width: 100%;
+    border-radius: var(--pretix-radius-control, 8px);
+    object-fit: cover;
   }
 
   .pretix-widget-action {
-    margin-left: 75%;
-    width: 25%;
-    padding: 0 15px;
+    margin-left: auto;
+    width: 100%;
+    max-width: 16rem;
+    padding: 0.5rem 0 0;
     box-sizing: border-box;
   }
 
   .pretix-widget-action button {
     width: 100%;
+    border-radius: var(--pretix-radius-pill, 999px);
+    font-weight: 600;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .pretix-widget-item-count-group {
+    border: 1px solid var(--pretix-border-strong, #cfd4dc);
+    border-radius: var(--pretix-radius-pill, 999px);
+    overflow: hidden;
+    background: var(--pretix-surface, #fff);
+    box-shadow: none;
+  }
+
+  .pretix-widget-item-count-dec,
+  .pretix-widget-item-count-inc {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    min-width: 2.55rem;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+
+    &:focus,
+    &:active,
+    &:active:focus {
+      outline: none !important;
+      box-shadow: none !important;
+      background: var(--pretix-surface-muted, #f5f6f8) !important;
+    }
+  }
+
+  .pretix-widget-item-count-group:has(button:focus),
+  .pretix-widget-item-count-group:has(input:focus) {
+    outline: 2px solid $brand-primary;
+    outline-offset: 2px;
+  }
+
+  .pretix-widget-item-count-group input,
+  .pretix-widget-item-count-multiple {
+    border: 0 !important;
+    border-left: 1px solid var(--pretix-border, #e4e7ec) !important;
+    border-right: 1px solid var(--pretix-border, #e4e7ec) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    min-height: 2.55rem !important;
+    height: 2.55rem !important;
+    padding: 0 !important;
+    appearance: textfield !important;
+    -moz-appearance: textfield !important;
+    -webkit-appearance: textfield !important;
+
+    &:focus {
+      outline: none !important;
+      box-shadow: none !important;
+      background: var(--pretix-surface-muted, #f5f6f8) !important;
+    }
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      margin: 0 !important;
+      display: none !important;
+    }
+  }
+
+  .pretix-widget-clear {
+    display: none;
   }
 
   .pretix-widget-voucher-text {
@@ -549,8 +677,13 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    padding: 6px 0;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.5rem;
     color: $text-color;
+    background: var(--pretix-surface, #fff);
+    border: 1px solid var(--pretix-border, #d9dee3);
+    border-radius: var(--pretix-radius-card, 12px);
+    box-shadow: var(--pretix-shadow-soft, none);
 
     &.pretix-widget-event-not-clickable {
       cursor: default;
@@ -561,7 +694,7 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
     }
 
     &:hover, &:active, &:focus {
-      background: $gray-lighter;
+      background: var(--pretix-surface-muted, #f5f6f8);
       text-decoration: none;
     }
 
@@ -686,6 +819,7 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
       flex-direction: row;
       align-items: center;
       gap: 0.5rem;
+      margin-bottom: 0.85rem;
 
       strong {
         flex: 1 1 auto;
@@ -1070,19 +1204,34 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
     }
   }
 
+  .pretix-widget-item-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "info info"
+      "price avail";
+  }
   .pretix-widget-item-info-col {
-    width: 100%;
+    width: auto;
     float: none;
-    margin-bottom: 5px;
+    margin-bottom: 0;
+    grid-area: info;
   }
   .pretix-widget-item-info-col:after {
     display: block;
     content: "";
     clear: both;
   }
-  .pretix-widget-item-price-col, .pretix-widget-item-availability-col {
-    width: 50%;
-    min-width: 140px;
+  .pretix-widget-item-price-col {
+    grid-area: price;
+    width: auto;
+    min-width: 0;
+    text-align: left;
+  }
+  .pretix-widget-item-availability-col {
+    grid-area: avail;
+    width: auto;
+    min-width: 0;
+    justify-self: end;
   }
   .pretix-widget-action {
     width: 100%;
@@ -1139,6 +1288,7 @@ $table-bg-accent: rgba(128, 128, 128, 0.05);
       flex-direction: row;
       align-items: center;
       gap: 0.25rem;
+      margin-bottom: 0.85rem;
 
       strong {
         flex: 1 1 auto;

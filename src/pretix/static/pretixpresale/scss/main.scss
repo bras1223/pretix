@@ -1,7 +1,7 @@
 // before variables.scss because it only affects presale, not control
-$body-bg: #f5f5f5 !default;
+$body-bg: #eef1f4 !default;
 
-$font-size-base: 0.875rem !default;/* 14px/16px = 0.875rem */
+$font-size-base: 0.9375rem !default;/* 15px/16px */
 
 $font-size-large:         ($font-size-base * 1.25) !default;
 $font-size-small:         ($font-size-base * .85) !default;
@@ -56,6 +56,7 @@ $headings-small-color: $text-muted;
 @import "_forms.scss";
 @import "_calendar.scss";
 @import "_checkout.scss";
+@import "_modern_shop.scss";
 @import "../../pretixbase/scss/webfont.scss";
 
 html {
@@ -158,7 +159,10 @@ button:active:focus, a:active:focus, .btn:active:focus, summary:active:focus, di
 button.active:focus, a.active:focus, .btn.active:focus,
 input:focus, .form-control:focus, .btn-checkbox:has(input:focus),
 input[type="file"]:focus, input[type="radio"]:focus, input[type="checkbox"]:focus,
-.input-item-count-group:has(input:focus), .input-group-price:has(input:focus) {
+.input-item-count-group:has(input:focus),
+.input-item-count-group:has(button:focus),
+.input-item-count-group:has(button:active),
+.input-group-price:has(input:focus) {
     outline: 2px solid $link-hover-color;
     outline-offset: 2px;
 }
@@ -167,7 +171,12 @@ input:focus, .form-control:focus {
     -webkit-box-shadow: none;
     box-shadow: none;
 }
-.btn-checkbox input:focus, .input-item-count-group input:focus, .input-group-price input:focus {
+.btn-checkbox input:focus,
+.input-item-count-group input:focus,
+.input-item-count-group > .btn:focus,
+.input-item-count-group > .btn:active:focus,
+.input-item-count-group > .btn.active:focus,
+.input-group-price input:focus {
     outline: none;
 }
 /* bootstrap sets dark background for active elements with hover/focus, we need to match specifity of selector */

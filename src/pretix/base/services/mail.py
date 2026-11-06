@@ -1009,9 +1009,18 @@ def _wrap_plain_body(content_plain, signature, event, order, position, no_order_
             )
         )
     elif event and order and not no_order_links:
-        body_plain += _(
-            "You are receiving this email because you placed an order for {event}."
-        ).format(event=event.name)
+        if getattr(event, 'is_voting', False):
+            body_plain += _(
+                "You are receiving this email because you cast a vote for {event}."
+            ).format(event=event.name)
+        elif getattr(event, 'is_form', False):
+            body_plain += _(
+                "You are receiving this email because you registered for {event}."
+            ).format(event=event.name)
+        else:
+            body_plain += _(
+                "You are receiving this email because you placed an order for {event}."
+            ).format(event=event.name)
         body_plain += "\r\n"
         body_plain += _(
             "You can view your order details at the following URL:\n{orderurl}."

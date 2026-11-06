@@ -51,13 +51,21 @@
     </div>
 {% else %}
     <div class="order-info">
-        {% if not request.event.is_voting %}
+        {% if event.is_voting %}
+            {% blocktrans trimmed with event=event.name %}
+                You are receiving this email because you cast a vote for <strong>{{ event }}</strong>.
+            {% endblocktrans %}
+        {% elif event.is_form %}
+            {% blocktrans trimmed with event=event.name %}
+                You are receiving this email because you registered for <strong>{{ event }}</strong>.
+            {% endblocktrans %}
+        {% else %}
             {% blocktrans trimmed with event=event.name %}
                 You are receiving this email because you placed an order for <strong>{{ event }}</strong>.
             {% endblocktrans %}
         {% endif %}
     </div>
-    {% if not request.event.is_voting %}
+    {% if not event.is_voting %}
         <table class="order-details">
         <tr>
             <td>
@@ -152,7 +160,7 @@
     {% endif %}
     <div class="order-button">
         <a href="{% abseventurl event "presale:event.order.open" hash=order.email_confirm_secret order=order.code secret=order.secret %}" class="button">
-        {% if not request.event.is_voting %}
+        {% if not event.is_voting %}
             {% trans "View order details" %}
         {%else%}
             Bekiektj details

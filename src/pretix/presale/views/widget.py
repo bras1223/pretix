@@ -395,7 +395,7 @@ class WidgetAPIProductList(EventListMixin, View):
         return grps, display_add_to_cart, len(items), items
 
     def post_process(self, data):
-        data['poweredby'] = get_powered_by(self.request, safelink=False)
+        data['poweredby'] = get_powered_by(self.request, safelink=False, compact=True)
 
     def response(self, data):
         self.post_process(data)

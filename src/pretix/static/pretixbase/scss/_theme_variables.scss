@@ -134,6 +134,25 @@ $in-border-radius-small: 2px !default;
   --pretix-border-radius-large: #{$in-border-radius-large};
   --pretix-border-radius-small: #{$in-border-radius-small};
 
+  // Semantic surface tokens for modern shop / widget chrome
+  --pretix-surface: #{$in-body-bg};
+  --pretix-surface-muted: #{mix(#f4f6f8, $in-body-bg, 70%)};
+  --pretix-border: #{mix(#e4e7ec, $in-brand-primary, 88%)};
+  --pretix-border-strong: #{mix(#cfd4dc, $in-brand-primary, 75%)};
+  @if ($in-border-radius-base == 0) {
+    --pretix-radius-card: 0;
+    --pretix-radius-control: 0;
+    --pretix-radius-pill: 0;
+    --pretix-shadow-soft: none;
+    --pretix-shadow-lift: none;
+  } @else {
+    --pretix-radius-card: 16px;
+    --pretix-radius-control: 10px;
+    --pretix-radius-pill: 999px;
+    --pretix-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.06);
+    --pretix-shadow-lift: 0 4px 6px rgba(15, 23, 42, 0.04), 0 16px 40px rgba(15, 23, 42, 0.08);
+  }
+
   @if (not $widget) {
     --pretix-body-bg: #{$in-body-bg};
     --pretix-warning-icon: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2036%2036'%20xmlns='http://www.w3.org/2000/svg'%20xml:space='preserve'%3E%3Cpath%20d='M20.04%202.89a2.2%202.2%200%200%200-3.87%200L2.88%2027.24a2.22%202.22%200%200%200%201.94%203.27h26.57a2.22%202.22%200%200%200%201.94-3.27L20.04%202.89Z'%20fill='%23fff'/%3E%3Cpath%20d='M19.92%2025.22c0%20.26-.2.47-.45.47h-2.73a.46.46%200%200%201-.45-.47v-2.7c0-.25.2-.46.45-.46h2.73c.25%200%20.45.21.45.47v2.7Zm-.02-5.31c-.02.19-.24.33-.5.33h-2.62c-.27%200-.48-.14-.48-.33l-.24-6.48c0-.09.04-.23.14-.3.09-.07.21-.16.34-.16h3.12c.13%200%20.26.09.35.16.1.07.14.18.14.27l-.26%206.51Z'%20fill='#{url-friendly-colour(darken($in-brand-warning, 25%))}'/%3E%3C/svg%3E");

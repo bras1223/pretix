@@ -37,7 +37,7 @@
   h3 {
     font-size: 0.875rem;
     color: $text-muted;
-    border-bottom: 2px solid $table-border-color;
+    border-bottom: 2px solid var(--pretix-border);
   }
   p {
     margin-bottom: 3px;
@@ -56,19 +56,21 @@
     background: var(--status-bg-color);
     color: var(--status-text-color);
     border: 1px solid var(--status-border-color);
-    border-radius: $border-radius-base;
+    border-radius: var(--pretix-radius-control);
+    box-shadow: none;
     &:before {
       content: "";
       position: absolute;
       top: 0;
       left: 0;
-      width: 11px;
+      width: 8px;
       height: 100%;
       background: var(--status-border-color);
+      border-radius: var(--pretix-radius-control) 0 0 var(--pretix-radius-control);
     }
 
-    padding: 3px 5px 3px 17px;
-    margin-bottom: 3px;
+    padding: 5px 7px 5px 15px;
+    margin-bottom: 4px;
     font-size: 12px;
     overflow-wrap: anywhere;
     text-decoration: none;
@@ -514,21 +516,36 @@ if concurrency is higher than 9, JavaScript (currently in pretixpresale/js/ui/ma
     a.day-label, .day-label {
       --status-text-color: #{$text-muted};
       display: block;
-      padding: 3px 3px 15px 12px;
+      padding: 6px 6px 14px 12px;
       font-size: 12px;
-      font-weight: bold;
+      font-weight: 600;
       color: var(--status-text-color);
       margin-bottom: 0;
+      border-radius: var(--pretix-radius-control);
+      background: var(--status-bg-color, transparent);
+      border: 1px solid var(--status-border-color, transparent);
+    }
+    .has-events a.day-label {
+      box-shadow: var(--pretix-shadow-soft);
     }
     .no-events .day-label {
       padding-left: 12px;
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
     }
     a.day-label:before {
       width: 8px;
+      border-radius: var(--pretix-radius-control) 0 0 var(--pretix-radius-control);
     }
   }
   #selected-day:has(*) {
     padding: $table-cell-padding;
+    border: 1px solid var(--pretix-border);
+    border-radius: var(--pretix-radius-card);
+    background: var(--pretix-surface);
+    box-shadow: var(--pretix-shadow-soft);
+    margin-top: 0.75rem;
   }
 }
 #monthselform .row {

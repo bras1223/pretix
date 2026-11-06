@@ -206,7 +206,7 @@
                                             <fieldset class="input-item-count-group" aria-describedby="c-{{ form.pos.pk }}-{{ category_idx }}-addon-count-desc cp-{{ form.pos.pk }}-item-{{ item.pk }}-min-order">
                                                 <legend class="sr-only">{% trans "Quantity" %}</legend>
                                                 <button type="button" data-step="-1" data-controls="cp_{{ form.pos.pk }}_variation_{{ item.id }}_{{ var.id }}" class="btn btn-default input-item-count-dec" aria-label="- {{ item }}, {{ var }}: {% trans "Decrease quantity" %}">-</button>
-                                                <input type="number" class="form-control input-item-count" placeholder="0" min="0"
+                                                <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-control input-item-count" placeholder="0" min="0"
                                                     {% if var.initial %}value="{{ var.initial }}"{% endif %}
                                                     {% if item.free_price %}
                                                        data-checked-onchange="price-variation-{{form.pos.pk}}-{{ item.pk }}-{{ var.pk }}"
@@ -352,7 +352,7 @@
                                 <fieldset class="input-item-count-group" aria-describedby="c-{{ form.pos.pk }}-{{ category_idx }}-addon-count-desc cp-{{ form.pos.pk }}-item-{{ item.pk }}-min-order">
                                     <legend class="sr-only">{% trans "Quantity" %}</legend>
                                     <button type="button" data-step="-1" data-controls="cp_{{ form.pos.pk }}_item_{{ item.id }}" class="btn btn-default input-item-count-dec" aria-label="- {{ item }}: {% trans "Decrease quantity" %}">-</button>
-                                    <input type="number" class="form-control input-item-count" placeholder="0" min="0"
+                                    <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-control input-item-count" placeholder="0" min="0"
                                         {% if item.free_price %}
                                            data-checked-onchange="price-item-{{ form.pos.pk }}-{{ item.pk }}"
                                         {% endif %}

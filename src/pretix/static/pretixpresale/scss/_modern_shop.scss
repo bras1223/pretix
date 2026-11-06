@@ -1,0 +1,518 @@
+// Sleek consumer-facing polish for the ticket shop (keeps Bootstrap structure)
+
+body {
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(180deg, #e8ecf1 0%, #eef1f4 40%, #e9edf2 100%);
+}
+
+.main-box {
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  box-shadow: var(--pretix-shadow-lift, var(--pretix-shadow-soft));
+}
+
+.page-header {
+  margin-top: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--pretix-border);
+
+  h1 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+  h1 a {
+    color: inherit;
+  }
+  h1 small {
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+}
+
+.item-category > .h3,
+h2.content-header,
+h2.subevent-head {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+// Panels → soft cards
+.panel {
+  border: 1px solid var(--pretix-border);
+  border-radius: var(--pretix-radius-card);
+  box-shadow: var(--pretix-shadow-soft);
+  background: var(--pretix-surface);
+  overflow: hidden;
+}
+
+.panel-default > .panel-heading,
+.panel > .panel-heading {
+  background: var(--pretix-surface) !important;
+  border-bottom: 1px solid var(--pretix-border);
+  color: inherit !important;
+  padding: 1rem 1.25rem;
+}
+
+.panel-default > .panel-heading .panel-title,
+.panel > .panel-heading .panel-title {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: inherit;
+}
+
+.panel-primary > .panel-heading {
+  background: linear-gradient(
+    135deg,
+    $brand-primary 0%,
+    var(--pretix-brand-primary-darken-10) 100%
+  ) !important;
+  border-bottom: none;
+  color: #fff !important;
+
+  .panel-title,
+  .panel-title strong,
+  a {
+    color: #fff !important;
+  }
+}
+
+.panel-body {
+  padding: 1.15rem 1.25rem;
+}
+
+details.panel > summary.panel-heading {
+  list-style: none;
+  cursor: pointer;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+}
+
+// Alerts
+.alert {
+  border-radius: var(--pretix-radius-card);
+  border-width: 1px;
+  padding-top: 0.95rem;
+  padding-right: 1.15rem;
+  padding-bottom: 0.95rem;
+  // keep default left padding for icon rail (do not set padding-left here)
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.alert-success,
+.alert-danger,
+.alert-info,
+.alert-warning,
+.alert-legal {
+  padding-left: 65px; // room for ::before icon rail
+
+  &::before {
+    border-top-left-radius: var(--pretix-radius-card);
+    border-bottom-left-radius: var(--pretix-radius-card);
+  }
+}
+
+.info-row {
+  margin-bottom: 1.25rem !important;
+
+  .info-row-icon {
+    opacity: 0.9;
+  }
+}
+
+// Forms & controls
+.form-control,
+select.form-control {
+  height: auto;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--pretix-border-strong, var(--pretix-border));
+  border-radius: var(--pretix-radius-control);
+  background: var(--pretix-surface);
+  box-shadow: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:focus {
+    border-color: $brand-primary;
+    box-shadow: 0 0 0 4px var(--pretix-brand-primary-tint-90);
+  }
+}
+
+// Keep addons / adjacent buttons aligned with taller modern inputs
+.input-group-addon,
+.input-group-btn > .btn {
+  min-height: 2.6rem;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+  border-radius: var(--pretix-radius-control);
+}
+
+// Outer corners match controls; shared edges stay square
+.input-group {
+  .form-control:first-child,
+  .input-group-addon:first-child,
+  .input-group-btn:first-child > .btn {
+    border-top-left-radius: var(--pretix-radius-control);
+    border-bottom-left-radius: var(--pretix-radius-control);
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .form-control:last-child,
+  .input-group-addon:last-child,
+  .input-group-btn:last-child > .btn {
+    border-top-right-radius: var(--pretix-radius-control);
+    border-bottom-right-radius: var(--pretix-radius-control);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .input-group-addon:not(:first-child):not(:last-child),
+  .input-group-btn:not(:first-child):not(:last-child) > .btn,
+  .form-control:not(:first-child):not(:last-child) {
+    border-radius: 0;
+  }
+}
+
+.btn {
+  border-radius: var(--pretix-radius-control);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.btn-lg {
+  padding: 0.8rem 1.25rem;
+  border-radius: var(--pretix-radius-control);
+}
+
+.btn-primary {
+  border: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 6px 16px rgba(15, 23, 42, 0.12);
+
+  &:hover,
+  &:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12), 0 12px 28px rgba(15, 23, 42, 0.14);
+  }
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.btn-default {
+  background: var(--pretix-surface);
+  border-color: var(--pretix-border-strong, var(--pretix-border));
+  color: $text-color;
+
+  &:hover,
+  &:focus {
+    background: var(--pretix-surface-muted);
+    border-color: var(--pretix-border-strong, var(--pretix-border));
+  }
+}
+
+// Product cards
+.item-category {
+  margin-top: 0.5rem;
+
+  > .h3 {
+    margin-bottom: 1rem;
+    font-size: 1.15rem;
+  }
+}
+
+// Align first products with cart (no extra top gap in main column)
+.shop-layout-main {
+  > form > .item-category:first-of-type,
+  > .item-category:first-of-type {
+    margin-top: 0;
+
+    > .h3 {
+      margin-top: 0;
+    }
+  }
+}
+
+.product-row {
+  border: 1px solid var(--pretix-border);
+  border-radius: var(--pretix-radius-card);
+  background: var(--pretix-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  padding: 1.2rem 1.35rem;
+  margin-bottom: 0.9rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+
+  &:hover {
+    border-color: var(--pretix-border-strong, var(--pretix-border));
+    box-shadow: var(--pretix-shadow-soft);
+    transform: translateY(-1px);
+  }
+
+  .h4 {
+    font-size: 1.08rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .price {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.02rem;
+  }
+}
+
+article.item-with-variations {
+  border-radius: var(--pretix-radius-card);
+  box-shadow: none;
+  border: 1px solid var(--pretix-border);
+
+  &:hover {
+    box-shadow: var(--pretix-shadow-soft);
+  }
+
+  > .product-row.headline {
+    background: var(--pretix-surface);
+  }
+
+  .variations {
+    background: var(--pretix-surface-muted);
+  }
+
+  .product-row.variation {
+    border: 1px solid var(--pretix-border);
+    box-shadow: none;
+  }
+}
+
+// Quantity stepper as pill control
+.input-item-count-group {
+  display: inline-flex !important;
+  align-items: stretch;
+  border: 1px solid var(--pretix-border-strong, var(--pretix-border)) !important;
+  border-radius: var(--pretix-radius-pill) !important;
+  overflow: hidden;
+  background: var(--pretix-surface);
+  min-width: 8rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+
+  > .btn,
+  > .input-item-count-dec,
+  > .input-item-count-inc,
+  .btn.input-item-count-dec,
+  .btn.input-item-count-inc {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    width: 2.55rem !important;
+    min-width: 2.55rem;
+    padding: 0.5rem 0 !important;
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: $text-color !important;
+    box-shadow: none !important;
+
+    &:hover,
+    &:focus,
+    &:active,
+    &:active:focus {
+      background: var(--pretix-surface-muted) !important;
+      transform: none !important;
+      box-shadow: none !important;
+      outline: none !important;
+    }
+  }
+
+  &:has(> .btn:focus),
+  &:has(> .btn:active) {
+    outline: 2px solid $link-hover-color;
+    outline-offset: 2px;
+  }
+
+  > .form-control,
+  > .input-item-count,
+  .form-control.input-item-count {
+    border: 0 !important;
+    border-left: 1px solid var(--pretix-border) !important;
+    border-right: 1px solid var(--pretix-border) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    min-height: 2.55rem !important;
+    height: 2.55rem !important;
+    width: 2.9rem !important;
+    flex: 1 1 auto;
+    padding: 0 !important;
+    margin: 0 !important;
+    text-align: center !important;
+    // normal line-height: equal height+line-height pushes glyphs optically high
+    line-height: normal !important;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    background: var(--pretix-surface) !important;
+    appearance: textfield !important;
+    -moz-appearance: textfield !important;
+    -webkit-appearance: textfield !important;
+
+    &:focus {
+      box-shadow: none !important;
+      outline: none !important;
+      background: var(--pretix-surface-muted) !important;
+    }
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      margin: 0 !important;
+      display: none !important;
+    }
+  }
+}
+
+.product-row .availability-box .input-item-count-group {
+  margin-left: auto;
+  margin-right: auto;
+  vertical-align: middle;
+}
+
+.btn-checkbox {
+  border-radius: var(--pretix-radius-pill);
+  padding-left: 1rem;
+  padding-right: 1rem;
+  font-weight: 600;
+}
+
+.shop-add-to-cart {
+  max-width: 18rem;
+
+  .btn-lg {
+    border-radius: var(--pretix-radius-pill);
+  }
+}
+
+// Cart
+.cart.panel {
+  border-radius: var(--pretix-radius-card);
+  box-shadow: var(--pretix-shadow-soft);
+}
+
+.cart-row {
+  border-bottom-color: var(--pretix-border);
+  padding: 0.95rem 0;
+}
+
+// Checkout stepper
+.checkout-flow {
+  background: var(--pretix-surface);
+  border: 1px solid var(--pretix-border);
+  border-radius: var(--pretix-radius-card);
+  padding: 1rem 1.15rem;
+  box-shadow: var(--pretix-shadow-soft);
+}
+
+// Calendar / date picker chrome
+.table-calendar {
+  border-collapse: separate;
+  border-spacing: 0;
+
+  thead th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: $text-muted;
+    padding-bottom: 0.75rem;
+  }
+
+  td.day {
+    border-radius: var(--pretix-radius-control);
+  }
+}
+
+.calendar-nav .input-group .form-control {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.calendar-nav select.form-control {
+  // Room for the native dropdown chevron
+  padding-right: 1.75rem;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b7280' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 0.75rem;
+}
+
+.calendar-nav .input-group-btn:last-child > .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.calendar-empty {
+  border-radius: var(--pretix-radius-card);
+  backdrop-filter: blur(2px);
+}
+
+// Front-page sections (voucher / order lookup)
+aside.front-page {
+  margin-top: 2rem;
+  padding: 1.25rem 1.35rem;
+  background: var(--pretix-surface-muted);
+  border: 1px solid var(--pretix-border);
+  border-radius: var(--pretix-radius-card);
+
+  > .h3,
+  > h2.h3 {
+    margin-top: 0;
+    margin-bottom: 0.85rem;
+  }
+
+  // Match redeem button to taller modern .form-control
+  .row-voucher .btn {
+    min-height: 2.6rem;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .row-voucher .input-group-addon {
+    min-height: 2.6rem;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+}
+
+footer {
+  opacity: 0.85;
+}
+
+footer nav {
+  font-size: 12px;
+}
+
+@media (min-width: $screen-sm-min) {
+  .main-box {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+    padding-top: 0.5rem;
+  }
+}
+
+@media (min-width: $screen-md-min) {
+  .shop-layout.shop-layout-with-cart,
+  .checkout-layout.checkout-layout-with-cart {
+    gap: 1.75rem 2rem;
+
+    .shop-layout-cart > .cart.panel,
+    > aside > .cart.panel {
+      box-shadow: var(--pretix-shadow-lift, var(--pretix-shadow-soft));
+    }
+  }
+}

@@ -37,7 +37,88 @@ h3, .h3 {
 }
 
 .main-box {
-  background: $main-box-bg;
+  background: var(--pretix-surface, #{$main-box-bg});
+  box-shadow: var(--pretix-shadow-soft);
+}
+
+.shop-layout {
+  display: block;
+}
+
+.shop-layout-main,
+.shop-layout-cart {
+  min-width: 0;
+}
+
+@media (min-width: $screen-md-min) {
+  .shop-layout.shop-layout-with-cart {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    gap: 1.5rem 1.75rem;
+    align-items: start;
+
+    .shop-layout-main {
+      order: 1;
+    }
+    .shop-layout-cart {
+      order: 2;
+      position: sticky;
+      top: 1rem;
+      z-index: 5;
+
+      > .cart.panel {
+        margin-bottom: 0;
+        border-radius: var(--pretix-radius-card);
+        box-shadow: var(--pretix-shadow-soft);
+        overflow: hidden;
+      }
+    }
+  }
+
+  .checkout-layout.checkout-layout-with-cart {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    gap: 1.5rem 1.75rem;
+    align-items: start;
+
+    > main {
+      order: 1;
+      min-width: 0;
+    }
+    > aside {
+      order: 2;
+      position: sticky;
+      top: 1rem;
+      z-index: 5;
+      min-width: 0;
+
+      > .cart.panel {
+        border-radius: var(--pretix-radius-card);
+        box-shadow: var(--pretix-shadow-soft);
+        overflow: hidden;
+      }
+    }
+  }
+}
+
+.panel {
+  border-radius: var(--pretix-radius-card);
+  border-color: var(--pretix-border);
+  box-shadow: none;
+}
+
+.panel-heading {
+  border-top-left-radius: var(--pretix-radius-card);
+  border-top-right-radius: var(--pretix-radius-card);
+}
+
+.btn {
+  border-radius: var(--pretix-radius-control);
+}
+
+.form-control {
+  border-radius: var(--pretix-radius-control);
+  border-color: var(--pretix-border);
 }
 
 .page-header-links > div.header-part {
@@ -89,10 +170,10 @@ h2.content-header {
 }
 @media (min-width: $screen-sm-min) {
   .main-box {
-    margin: calc(20px * var(--pretix-body-bg-white-0)) auto;
-    padding-left: calc(25px * var(--pretix-body-bg-white-0) + 15px * var(--pretix-body-bg-white-1));
-    padding-right: calc(25px * var(--pretix-body-bg-white-0) + 15px * var(--pretix-body-bg-white-1));
-    border-radius: calc(#{$border-radius-large} * var(--pretix-body-bg-white-0));
+    margin: calc(24px * var(--pretix-body-bg-white-0)) auto;
+    padding-left: calc(28px * var(--pretix-body-bg-white-0) + 16px * var(--pretix-body-bg-white-1));
+    padding-right: calc(28px * var(--pretix-body-bg-white-0) + 16px * var(--pretix-body-bg-white-1));
+    border-radius: calc(var(--pretix-radius-card) * var(--pretix-body-bg-white-0));
   }
   .page-header-links-outside {
     padding-left: calc(15px * var(--pretix-body-bg-white-1));

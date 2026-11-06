@@ -140,7 +140,11 @@ let form_handlers = function (el) {
 		let step = parseFloat(this.getAttribute('data-step'))
 		let controls = document.getElementById(this.getAttribute('data-controls'))
 		let currentValue = parseFloat(controls.value)
-		controls.value = Math.max(controls.min, Math.min(controls.max || Number.MAX_SAFE_INTEGER, (currentValue || 0) + step))
+		let min = parseFloat(controls.getAttribute('min'))
+		let max = parseFloat(controls.getAttribute('max'))
+		if (Number.isNaN(min)) min = 0
+		if (Number.isNaN(max)) max = Number.MAX_SAFE_INTEGER
+		controls.value = Math.max(min, Math.min(max, (currentValue || 0) + step))
 		controls.dispatchEvent(new Event('change', { bubbles: true }))
 	})
 	el.find('.btn-checkbox input').on('change', function (e) {

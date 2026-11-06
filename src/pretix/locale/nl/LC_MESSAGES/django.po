@@ -765,20 +765,25 @@ msgstr ""
 
 #: pretix/base/context.py
 #, python-brace-format
+msgid "<a {a_attr}>powered by {name}</a>"
+msgstr "<a {a_attr}>Mogelijk gemaakt door {name}</a>"
+
+#: pretix/base/context.py
+#, python-brace-format
 msgid "<a {a_name_attr}>powered by {name}</a> <a {a_attr}>based on pretix</a>"
 msgstr ""
-"<a {a_name_attr}>mogelijk gemaakt door {name}</a> <a {a_attr}> gebaseerd op "
+"<a {a_name_attr}>Mogelijk gemaakt door {name}</a> <a {a_attr}>gebaseerd op "
 "pretix</a>"
 
 #: pretix/base/context.py
 #, python-brace-format
 msgid "<a {a_attr}>powered by {name} based on pretix</a>"
-msgstr "<a {a_attr}>mogelijk gemaakt door {name} gebaseerd op pretix</a>"
+msgstr "<a {a_attr}>Mogelijk gemaakt door {name} gebaseerd op pretix</a>"
 
 #: pretix/base/context.py
 #, python-format
-msgid "<a %(a_attr)s>ticketing powered by Caught</a>"
-msgstr "<a %(a_attr)s>ticketverkoop mogelijk gemaakt door Caught</a>"
+msgid "<a %(a_attr)s>powered by Caught</a>"
+msgstr "<a %(a_attr)s>Mogelijk gemaakt door Caught</a>"
 
 #: pretix/base/context.py
 msgid "source code"
@@ -9125,10 +9130,21 @@ msgstr ""
 
 #: pretix/base/services/mail.py
 #, python-brace-format
+msgid "You are receiving this email because you cast a vote for {event}."
+msgstr ""
+"U ontvangt deze e-mail omdat u een stem uitgebracht heeft voor {event}."
+
+#: pretix/base/services/mail.py
+#, python-brace-format
+msgid "You are receiving this email because you registered for {event}."
+msgstr ""
+"U ontvangt deze e-mail omdat u zich aangemeld heeft voor {event}."
+
+#: pretix/base/services/mail.py
+#, python-brace-format
 msgid "You are receiving this email because you placed an order for {event}."
 msgstr ""
-"U ontvangt deze e-mail omdat u een bestelling geplaatst hebt voor het "
-"evenement {event}."
+"U ontvangt deze e-mail omdat u een bestelling geplaatst hebt voor {event}."
 
 #: pretix/base/services/media.py
 #, fuzzy
@@ -13579,11 +13595,29 @@ msgstr "Contact:"
 #: pretix/base/templates/pretixbase/email/order_details.html
 #, python-format
 msgid ""
+"You are receiving this email because you cast a vote for "
+"<strong>%(event)s</strong>."
+msgstr ""
+"U ontvangt deze e-mail omdat u een stem uitgebracht heeft voor "
+"<strong>%(event)s</strong>."
+
+#: pretix/base/templates/pretixbase/email/order_details.html
+#, python-format
+msgid ""
+"You are receiving this email because you registered for "
+"<strong>%(event)s</strong>."
+msgstr ""
+"U ontvangt deze e-mail omdat u zich aangemeld heeft voor "
+"<strong>%(event)s</strong>."
+
+#: pretix/base/templates/pretixbase/email/order_details.html
+#, python-format
+msgid ""
 "You are receiving this email because you placed an order for "
 "<strong>%(event)s</strong>."
 msgstr ""
-"U ontvangt deze e-mail omdat u een bestelling geplaatst hebt voor het "
-"evenement <strong>%(event)s</strong>."
+"U ontvangt deze e-mail omdat u een bestelling geplaatst hebt voor "
+"<strong>%(event)s</strong>."
 
 #: pretix/base/templates/pretixbase/email/order_details.html
 #: pretix/control/templates/pretixcontrol/organizers/customer.html
@@ -34802,11 +34836,23 @@ msgid "This ticket shop is currently in test mode."
 msgstr "Deze ticketwinkel bevindt zich momenteel in de testmodus."
 
 #: pretix/presale/templates/pretixpresale/event/base.html
+msgid "This registration form is currently in test mode."
+msgstr "Dit aanmeldformulier bevindt zich momenteel in de testmodus."
+
+#: pretix/presale/templates/pretixpresale/event/base.html
 msgid ""
 "Please do not perform any real purchases as your order might be deleted "
 "without notice."
 msgstr ""
 "Voer geen echte aankopen uit, aangezien uw bestelling zonder kennisgeving "
+"kan worden verwijderd."
+
+#: pretix/presale/templates/pretixpresale/event/base.html
+msgid ""
+"Please do not perform any real registrations as your submission might be "
+"deleted without notice."
+msgstr ""
+"Voer geen echte aanmeldingen uit, aangezien uw aanmelding zonder kennisgeving "
 "kan worden verwijderd."
 
 #: pretix/presale/templates/pretixpresale/event/base.html
@@ -35853,6 +35899,13 @@ msgid "%(amount)s× in your cart"
 msgid_plural "%(amount)s× in your cart"
 msgstr[0] "%(amount)s× in uw winkelwagen"
 msgstr[1] "%(amount)s× in uw winkelwagen"
+
+#: pretix/presale/templates/pretixpresale/event/fragment_product_list.html
+#, python-format
+msgid "%(amount)s× in your registration"
+msgid_plural "%(amount)s× in your registration"
+msgstr[0] "%(amount)s× in uw aanmelding"
+msgstr[1] "%(amount)s× in uw aanmelding"
 
 #: pretix/presale/templates/pretixpresale/event/fragment_product_list.html
 #, python-format
