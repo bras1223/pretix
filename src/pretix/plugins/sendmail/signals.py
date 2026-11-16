@@ -50,9 +50,9 @@ from pretix.base.logentrytypes import (
     EventLogEntryType, OrderLogEntryType, WaitingListEntryLogEntryType,
     log_entry_types,
 )
-from pretix.base.models import SubEvent
+from pretix.base.models import Order, SubEvent
 from pretix.base.signals import (
-    EventPluginSignal, event_copy_data, periodic_task,
+    EventPluginSignal, event_copy_data, order_paid, order_placed, periodic_task,
 )
 from pretix.control.signals import nav_event
 from pretix.helpers import OF_SELF
@@ -181,11 +181,18 @@ def sendmail_run_rules(sender, **kwargs):
             for i in range(max(1, 5000 // batch_size)):
                 ScheduledMail.objects.filter(pk__in=unchanged[i * batch_size:batch_size]).update(last_computed=now())
 
+        catch_up_q = Q(
+            rule__catch_up_late_orders=True,
+            rule__date_is_absolute=False,
+            rule__offset_is_after=False,
+        )
+        # Ordinary rules: drop if more than five days overdue. Catch-up rules stay open until
+        # after their "day before" window (handled when sending).
         mails.filter(
             state=ScheduledMail.STATE_SCHEDULED,
-            computed_datetime__lte=timezone.now() - datetime.timedelta(days=2),
+            computed_datetime__lte=timezone.now() - datetime.timedelta(days=5),
             event__live=True,
-        ).update(
+        ).exclude(catch_up_q).update(
             state=ScheduledMail.STATE_MISSED
         )
         for m_id in mails.filter(
@@ -193,8 +200,9 @@ def sendmail_run_rules(sender, **kwargs):
             state__in=(ScheduledMail.STATE_SCHEDULED, ScheduledMail.STATE_FAILED),
             rule__enabled=True,
             event__live=True,
-            computed_datetime__gte=timezone.now() - datetime.timedelta(days=2),
             computed_datetime__lte=timezone.now(),
+        ).filter(
+            catch_up_q | Q(computed_datetime__gte=timezone.now() - datetime.timedelta(days=5))
         ).values_list('pk', flat=True):
             # We try to send the emails in a "reasonably safe" way.
             # - We use PostgreSQL-level locking to prevent to cronjob processes trying to
@@ -210,21 +218,40 @@ def sendmail_run_rules(sender, **kwargs):
             #   emails at all. Under the assumption that system-level failures are rare and (more
             #   importantly) usually don't happen multiple times in a row, this seems like a
             #   good tradeoff.
-            # - We never retry for more than two days.
+            # - Ordinary rules are not retried for more than five days; catch-up rules stay open
+            #   until the day before the event.
 
             with transaction.atomic(durable=True):
                 m = ScheduledMail.objects.select_for_update(
                     of=OF_SELF,
                     skip_locked=connection.features.has_select_for_update_skip_locked
-                ).filter(pk=m_id).first()
+                ).select_related('rule', 'event', 'subevent').filter(pk=m_id).first()
                 if not m or m.state not in (ScheduledMail.STATE_SCHEDULED, ScheduledMail.STATE_FAILED):
                     # object is currently locked by other thread (currently being sent)
                     # or has been sent in the meantime
                     continue
 
+                if not m.due_for_send():
+                    if m.supports_catch_up:
+                        final = m.final_catch_up_datetime()
+                        e = m.subevent or m.event
+                        event_start = e.date_from
+                        if final and timezone.now() > final + datetime.timedelta(days=5):
+                            m.state = ScheduledMail.STATE_MISSED
+                            m.save(update_fields=['state'])
+                        elif event_start and timezone.now() > event_start + datetime.timedelta(days=1):
+                            m.state = ScheduledMail.STATE_COMPLETED
+                            m.save(update_fields=['state'])
+                    continue
+
                 try:
                     m.send()
-                    m.state = ScheduledMail.STATE_COMPLETED
+                    if m.supports_catch_up and timezone.now() <= m.final_catch_up_datetime():
+                        # Keep open for later orders; RuleOrderSent prevents duplicates.
+                        m.state = ScheduledMail.STATE_SCHEDULED
+                        m.last_successful_order_id = None
+                    else:
+                        m.state = ScheduledMail.STATE_COMPLETED
                     m.save(update_fields=['state', 'last_successful_order_id'])
                 except Exception as e:
                     logger.exception('Could not send emails, will retry')
@@ -234,6 +261,54 @@ def sendmail_run_rules(sender, **kwargs):
                     if settings.SENTRY_ENABLED:
                         from sentry_sdk import capture_exception
                         capture_exception(e)
+
+
+def _sendmail_catch_up_immediate_for_order(order: Order):
+    """Send catch-up rule emails immediately when the order is after the last regular slot."""
+    event = order.event
+    if not event.live or 'pretix.plugins.sendmail' not in (event.plugins or ''):
+        return
+
+    rules = event.sendmail_rules.filter(
+        enabled=True,
+        catch_up_late_orders=True,
+        date_is_absolute=False,
+        offset_is_after=False,
+    )
+    if not rules.exists():
+        return
+
+    now_dt = timezone.now()
+    for rule in rules:
+        sms = ScheduledMail.objects.filter(
+            rule=rule,
+            event=event,
+            state__in=(ScheduledMail.STATE_SCHEDULED, ScheduledMail.STATE_FAILED, ScheduledMail.STATE_COMPLETED),
+        ).select_related('subevent', 'rule', 'event')
+
+        for m in sms:
+            if not m.supports_catch_up:
+                continue
+            final = m.final_catch_up_datetime()
+            if not final or now_dt <= final:
+                continue
+            e = m.subevent or m.event
+            if e.date_from and now_dt > e.date_from + datetime.timedelta(days=1):
+                continue
+            try:
+                m.send_to_order_if_eligible(order)
+            except Exception:
+                logger.exception('Could not send immediate catch-up mail for order %s rule %s', order.pk, rule.pk)
+
+
+@receiver(order_placed, dispatch_uid="sendmail_catch_up_order_placed")
+def sendmail_catch_up_order_placed(sender, order: Order, **kwargs):
+    _sendmail_catch_up_immediate_for_order(order)
+
+
+@receiver(order_paid, dispatch_uid="sendmail_catch_up_order_paid")
+def sendmail_catch_up_order_paid(sender, order: Order, **kwargs):
+    _sendmail_catch_up_immediate_for_order(order)
 
 
 @receiver(signal=event_copy_data, dispatch_uid="sendmail_copy_event")

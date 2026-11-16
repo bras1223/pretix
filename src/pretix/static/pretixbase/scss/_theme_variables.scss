@@ -134,9 +134,10 @@ $in-border-radius-small: 2px !default;
   --pretix-border-radius-large: #{$in-border-radius-large};
   --pretix-border-radius-small: #{$in-border-radius-small};
 
-  // Semantic surface tokens for modern shop / widget chrome
-  --pretix-surface: #{$in-body-bg};
-  --pretix-surface-muted: #{mix(#f4f6f8, $in-body-bg, 70%)};
+  // Semantic surface tokens for modern shop / widget chrome (always light content surfaces;
+  // do not follow body background — main-box stays white even with a dark page background)
+  --pretix-surface: #FFFFFF;
+  --pretix-surface-muted: #f4f6f8;
   --pretix-border: #{mix(#e4e7ec, $in-brand-primary, 88%)};
   --pretix-border-strong: #{mix(#cfd4dc, $in-brand-primary, 75%)};
   @if ($in-border-radius-base == 0) {

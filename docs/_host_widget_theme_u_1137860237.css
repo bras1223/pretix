@@ -1,0 +1,99 @@
+/* Host CSS for Duda block u_1137860237 — pretix widget on red background
+   Updated for modern widget cards (white surface + status chips). */
+
+*#dm *.dmBody div.u_1137860237 {
+  background-color: rgba(202, 32, 38, 1) !important;
+}
+
+*#dm *.dmBody div.u_1137860237 a {
+  color: rgb(255, 205, 104) !important;
+}
+
+/* Calendar / nav chrome on red */
+*#dm *.dmBody div.u_1137860237 .pretix-widget-event-calendar-table th,
+*#dm *.dmBody div.u_1137860237 .pretix-widget-event-calendar-head,
+*#dm *.dmBody div.u_1137860237 .pretix-widget-event-calendar-head a,
+*#dm *.dmBody div.u_1137860237 .pretix-widget-back a,
+*#dm *.dmBody div.u_1137860237 .pretix-widget-attribution,
+*#dm *.dmBody div.u_1137860237 .pretix-widget-attribution a {
+  color: #ffffff !important;
+}
+
+*#dm *.dmBody div.u_1137860237 div.pretix-widget-event-calendar-day {
+  text-align: center !important;
+}
+
+*#dm *.dmBody div.u_1137860237 td.pretix-widget-has-events {
+  border: solid 0.1px #ffffff75 !important;
+}
+
+*#dm *.dmBody div.u_1137860237 td.pretix-widget-has-events:hover {
+  background: #581b5b94 !important;
+}
+
+*#dm *.dmBody div.u_1137860237 td.pretix-widget-day-not-openable:hover {
+  background: transparent !important;
+}
+
+/* Subevent chips in the calendar keep their status colors (do not force white) */
+*#dm *.dmBody div.u_1137860237 a.pretix-widget-event-calendar-event {
+  color: var(--status-text-color, #111) !important;
+  background-color: var(--status-bg-color, #fff) !important;
+  border-color: var(--status-border-color, #111) !important;
+}
+
+*#dm *.dmBody div.u_1137860237 a.pretix-widget-event-calendar-event:hover {
+  filter: brightness(0.95);
+}
+
+/* Event list: keep cards readable — dark text on light surface (not white-on-white) */
+*#dm *.dmBody div.u_1137860237 a.pretix-widget-event-list-entry,
+*#dm *.dmBody div.u_1137860237 span.pretix-widget-event-list-entry {
+  color: #1a1a1a !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+
+*#dm *.dmBody div.u_1137860237 a.pretix-widget-event-list-entry:hover,
+*#dm *.dmBody div.u_1137860237 span.pretix-widget-event-list-entry:hover {
+  background: #ffffff !important;
+  box-shadow: 0 0 0 2px rgba(255, 205, 104, 0.55) !important;
+}
+
+*#dm *.dmBody div.u_1137860237 .pretix-widget-event-list-entry-name {
+  color: #1a1a1a !important;
+}
+
+*#dm *.dmBody div.u_1137860237 .pretix-widget-event-list-entry-date,
+*#dm *.dmBody div.u_1137860237 .pretix-widget-event-list-entry-crowd {
+  color: #4b5563 !important;
+  opacity: 1 !important;
+}
+
+*#dm *.dmBody div.u_1137860237 .pretix-widget-event-list-entry-availability span {
+  color: var(--status-text-color, inherit) !important;
+}
+
+/* Quantity stepper on red background */
+*#dm *.dmBody div.u_1137860237 input.pretix-widget-item-count-multiple {
+  color: #1a1a1a !important;
+  margin: 0 !important;
+}
+
+*#dm *.dmBody div.u_1137860237 .pretix-widget-item-count-group {
+  background: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+}
+
+*#dm *.dmBody div.u_1137860237 .pretix-widget-item-count-dec,
+*#dm *.dmBody div.u_1137860237 .pretix-widget-item-count-inc {
+  color: #1a1a1a !important;
+}
+
+*#dm *.dmBody div.u_1137860237 div.pretix-widget-item-price-col {
+  height: 45px !important;
+  display: flex !important;
+  align-items: center !important;
+  color: #ffffff !important;
+}

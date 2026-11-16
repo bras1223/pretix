@@ -308,7 +308,7 @@ class RuleForm(FormPlaceholderMixin, I18nModelForm):
         fields = ['subject', 'template', 'attach_ical', 'send_date',
                   'send_offset_days', 'send_offset_time', 'subevent',
                   'all_products', 'limit_products', 'restrict_to_status',
-                  'checked_in_status', 'send_to', 'enabled']
+                  'checked_in_status', 'send_to', 'enabled', 'catch_up_late_orders']
 
         field_classes = {
             'subevent': SafeModelMultipleChoiceField,
@@ -327,6 +327,9 @@ class RuleForm(FormPlaceholderMixin, I18nModelForm):
             'send_offset_time': TimePickerWidget(attrs={
                 'data-display-dependency': '#id_schedule_type_1,#id_schedule_type_2,#id_schedule_type_3,'
                                            '#id_schedule_type_4',
+            }),
+            'catch_up_late_orders': forms.CheckboxInput(attrs={
+                'data-display-dependency': '#id_schedule_type_1,#id_schedule_type_2',
             }),
             'limit_products': forms.CheckboxSelectMultiple(
                 attrs={'class': 'scrolling-multiple-choice',
@@ -484,5 +487,9 @@ class RuleForm(FormPlaceholderMixin, I18nModelForm):
                 pass  # keep existing value when field was hidden
             else:
                 self.instance.offset_relative_to_subevent = True
+
+        if dia not in ('rel_b_s', 'rel_b_e'):
+            d['catch_up_late_orders'] = False
+            self.instance.catch_up_late_orders = False
 
         return d

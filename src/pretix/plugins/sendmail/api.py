@@ -36,7 +36,8 @@ class RuleSerializer(I18nAwareModelSerializer):
         model = Rule
         fields = ['id', 'subject', 'template', 'all_products', 'limit_products', 'restrict_to_status',
                   'checked_in_status', 'send_date', 'send_offset_days', 'send_offset_time', 'date_is_absolute',
-                  'offset_to_event_end', 'offset_is_after', 'offset_relative_to_subevent', 'send_to', 'enabled']
+                  'offset_to_event_end', 'offset_is_after', 'offset_relative_to_subevent', 'send_to', 'enabled',
+                  'catch_up_late_orders']
         read_only_fields = ['id']
 
     def to_internal_value(self, data):

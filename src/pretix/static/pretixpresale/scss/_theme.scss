@@ -37,7 +37,7 @@ h3, .h3 {
 }
 
 .main-box {
-  background: var(--pretix-surface, #{$main-box-bg});
+  background: #{$main-box-bg};
   box-shadow: var(--pretix-shadow-soft);
 }
 

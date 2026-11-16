@@ -108,19 +108,105 @@ class ScheduledMail(models.Model):
             self.state = self.STATE_SCHEDULED
         self.last_computed = timezone.now()
 
-    def send(self):
-        if self.state not in (ScheduledMail.STATE_SCHEDULED, ScheduledMail.STATE_FAILED):
-            raise ValueError("Should not be called in this state")
+    @property
+    def supports_catch_up(self):
+        rule = self.rule
+        return (
+            rule.catch_up_late_orders
+            and not rule.date_is_absolute
+            and not rule.offset_is_after
+            and rule.send_offset_time is not None
+        )
 
+    def _event_or_subevent(self):
+        return self.subevent or self.event
+
+    def final_catch_up_datetime(self):
+        """Last regular send moment: day before the (sub)event at the rule's time of day."""
+        if not self.supports_catch_up:
+            return None
+        e = self._event_or_subevent()
+        base_time = (e.date_to or e.date_from) if self.rule.offset_to_event_end else e.date_from
+        d = base_time.astimezone(self.event.timezone).date() - timedelta(days=1)
+        st = self.rule.send_offset_time
+        dt = make_aware(
+            datetime.combine(d, time(hour=st.hour, minute=st.minute, second=st.second, microsecond=0, fold=1)),
+            self.event.timezone,
+        )
+        if not datetime_exists(dt):
+            dt = make_aware(
+                datetime.combine(d, time(hour=st.hour, minute=st.minute, second=st.second, microsecond=0)) + timedelta(hours=1),
+                self.event.timezone,
+            )
+        # Never schedule catch-up after the primary send time would already be the day before
+        # (e.g. rule is "1 day before") - primary itself is the final regular moment.
+        if self.computed_datetime and dt < self.computed_datetime:
+            return self.computed_datetime
+        return dt
+
+    def todays_send_datetime(self, when=None):
+        when = when or timezone.now()
+        st = self.rule.send_offset_time
+        local = when.astimezone(self.event.timezone)
+        dt = make_aware(
+            datetime.combine(local.date(), time(hour=st.hour, minute=st.minute, second=st.second, microsecond=0, fold=1)),
+            self.event.timezone,
+        )
+        if not datetime_exists(dt):
+            dt = make_aware(
+                datetime.combine(local.date(), time(hour=st.hour, minute=st.minute, second=st.second, microsecond=0)) + timedelta(hours=1),
+                self.event.timezone,
+            )
+        return dt
+
+    def due_for_send(self, when=None):
+        """Whether the periodic task should process this scheduled mail now."""
+        when = when or timezone.now()
+        if when < self.computed_datetime:
+            return False
+        if not self.supports_catch_up:
+            return True
+        today_send = self.todays_send_datetime(when)
+        final = self.final_catch_up_datetime()
+        if when <= final:
+            # Evening batch: only at/after the configured time of day
+            return when >= today_send
+        # After the last regular slot: one more pass for anyone still pending who ordered before final
+        return True
+
+    def order_cutoff_for_send(self, when=None):
+        when = when or timezone.now()
+        if not self.supports_catch_up:
+            return None
+        final = self.final_catch_up_datetime()
+        today_send = self.todays_send_datetime(when)
+        if when > final:
+            return final
+        return min(today_send, final)
+
+    def _status_q(self):
+        status_q = Q(status__in=self.rule.restrict_to_status)
+        if 'n__pending_approval' in self.rule.restrict_to_status:
+            status_q |= Q(status=Order.STATUS_PENDING, require_approval=True)
+        if 'n__not_pending_approval_and_not_valid_if_pending' in self.rule.restrict_to_status:
+            status_q |= Q(status=Order.STATUS_PENDING, require_approval=False, valid_if_pending=False)
+        if 'n__valid_if_pending' in self.rule.restrict_to_status:
+            status_q |= Q(status=Order.STATUS_PENDING, require_approval=False, valid_if_pending=True)
+        if 'n__pending_overdue' in self.rule.restrict_to_status:
+            status_q |= Q(status=Order.STATUS_PENDING, require_approval=False, valid_if_pending=False,
+                          expires__lt=now())
+        return status_q
+
+    def _order_positions_queryset(self, order=None):
         e = self.event
-
-        orders = e.orders.all()
-
-        filter_orders_by_op = False
         op_qs = OrderPosition.objects.filter(
             order__event=self.event,
             canceled=False,
         )
+        if order is not None:
+            op_qs = op_qs.filter(order=order)
+
+        filter_orders_by_op = False
 
         if self.subevent_id:
             filter_orders_by_op = True
@@ -148,21 +234,131 @@ class ScheduledMail(models.Model):
             filter_orders_by_op = True
             op_qs = op_qs.filter(Exists(Checkin.objects.filter(position_id=OuterRef('pk'), list__consider_tickets_used=True)))
 
-        status_q = Q(status__in=self.rule.restrict_to_status)
-        if 'n__pending_approval' in self.rule.restrict_to_status:
-            status_q |= Q(status=Order.STATUS_PENDING, require_approval=True)
-        if 'n__not_pending_approval_and_not_valid_if_pending' in self.rule.restrict_to_status:
-            status_q |= Q(status=Order.STATUS_PENDING, require_approval=False, valid_if_pending=False)
-        if 'n__valid_if_pending' in self.rule.restrict_to_status:
-            status_q |= Q(status=Order.STATUS_PENDING, require_approval=False, valid_if_pending=True)
-        if 'n__pending_overdue' in self.rule.restrict_to_status:
-            status_q |= Q(status=Order.STATUS_PENDING, require_approval=False, valid_if_pending=False,
-                          expires__lt=now())
+        return op_qs, filter_orders_by_op
 
+    def _send_to_order(self, o, position_ids):
+        e = self.event
+        send_to_orders = self.rule.send_to in (Rule.CUSTOMERS, Rule.BOTH)
+        send_to_attendees = self.rule.send_to in (Rule.ATTENDEES, Rule.BOTH)
+
+        with language(o.locale, e.settings.region):
+            positions = list(o.positions.all())
+            send_to_order = send_to_orders
+
+            try:
+                ia = o.invoice_address
+            except InvoiceAddress.DoesNotExist:
+                ia = InvoiceAddress(order=o)
+
+            if send_to_attendees:
+                parent_op = None
+                sent_to_positions = set()
+                for p in positions:
+                    if p.addon_to_id is None:
+                        parent_op = p
+                    elif not parent_op or p.addon_to_id != parent_op.id:
+                        logger.warning(f"Add-ons are mixed up for position #{p.positionid} in order {o.full_code}")
+                        continue
+
+                    if p.id not in position_ids:
+                        continue
+
+                    if p.addon_to_id and (
+                        not p.attendee_email or p.attendee_email == parent_op.attendee_email
+                    ):
+                        p = parent_op
+
+                    if p.pk in sent_to_positions:
+                        continue
+
+                    if not p.attendee_email or p.attendee_email == o.email:
+                        send_to_order = True
+                        continue
+
+                    email_ctx = get_email_context(
+                        event=e,
+                        order=o,
+                        invoice_address=ia,
+                        position=p,
+                        event_or_subevent=self.subevent or e,
+                    )
+                    p.send_mail(self.rule.subject, self.rule.template, email_ctx,
+                                attach_ical=self.rule.attach_ical,
+                                log_entry_type='pretix.plugins.sendmail.rule.order.position.email.sent')
+                    sent_to_positions.add(p.pk)
+
+            if send_to_order and o.email:
+                email_ctx = get_email_context(
+                    event=e,
+                    order=o,
+                    invoice_address=ia,
+                    event_or_subevent=self.subevent or e,
+                )
+                o.send_mail(self.rule.subject, self.rule.template, email_ctx,
+                            attach_ical=self.rule.attach_ical,
+                            log_entry_type='pretix.plugins.sendmail.rule.order.email.sent')
+
+        self._mark_order_sent(o)
+
+    def _already_sent_q(self, order_field='pk'):
+        qs = RuleOrderSent.objects.filter(rule=self.rule, order_id=OuterRef(order_field))
+        if self.subevent_id:
+            qs = qs.filter(subevent_id=self.subevent_id)
+        else:
+            qs = qs.filter(subevent__isnull=True)
+        return qs
+
+    def _mark_order_sent(self, o):
+        qs = RuleOrderSent.objects.filter(rule=self.rule, order=o)
+        if self.subevent_id:
+            qs = qs.filter(subevent_id=self.subevent_id)
+        else:
+            qs = qs.filter(subevent__isnull=True)
+        if not qs.exists():
+            RuleOrderSent.objects.create(rule=self.rule, order=o, subevent=self.subevent)
+
+    def _was_sent_to_order(self, order):
+        qs = RuleOrderSent.objects.filter(rule=self.rule, order=order)
+        if self.subevent_id:
+            return qs.filter(subevent_id=self.subevent_id).exists()
+        return qs.filter(subevent__isnull=True).exists()
+
+    def send_to_order_if_eligible(self, order):
+        """Send this scheduled mail to a single order if it matches and was not sent yet."""
+        if self._was_sent_to_order(order):
+            return False
+        if order.event_id != self.event_id:
+            return False
+        if not Order.objects.filter(pk=order.pk).filter(self._status_q()).exists():
+            return False
+
+        op_qs, filter_orders_by_op = self._order_positions_queryset(order=order)
+        if filter_orders_by_op and not op_qs.exists():
+            return False
+
+        position_ids = set(op_qs.values_list('id', flat=True))
+        self._send_to_order(order, position_ids)
+        return True
+
+    def send(self):
+        if self.state not in (ScheduledMail.STATE_SCHEDULED, ScheduledMail.STATE_FAILED):
+            raise ValueError("Should not be called in this state")
+
+        e = self.event
+        op_qs, filter_orders_by_op = self._order_positions_queryset()
+        status_q = self._status_q()
+
+        orders = e.orders.all()
         if self.last_successful_order_id:
-            orders = orders.filter(
-                pk__gt=self.last_successful_order_id
-            )
+            orders = orders.filter(pk__gt=self.last_successful_order_id)
+
+        orders = orders.annotate(
+            _sendmail_already_sent=Exists(self._already_sent_q())
+        ).filter(_sendmail_already_sent=False)
+
+        cutoff = self.order_cutoff_for_send()
+        if cutoff is not None:
+            orders = orders.filter(datetime__lte=cutoff)
 
         if filter_orders_by_op:
             orders = orders.filter(pk__in=op_qs.values_list('order_id', flat=True))
@@ -170,77 +366,11 @@ class ScheduledMail(models.Model):
             status_q,
         ).order_by('pk').select_related('invoice_address').prefetch_related('positions')
 
-        send_to_orders = self.rule.send_to in (Rule.CUSTOMERS, Rule.BOTH)
-        send_to_attendees = self.rule.send_to in (Rule.ATTENDEES, Rule.BOTH)
-
-        position_ids = op_qs.values_list('id', flat=True)
+        position_ids = set(op_qs.values_list('id', flat=True))
 
         for o in orders:
-            with language(o.locale, e.settings.region):
-                positions = list(o.positions.all())
-                send_to_order = send_to_orders
-
-                try:
-                    ia = o.invoice_address
-                except InvoiceAddress.DoesNotExist:
-                    ia = InvoiceAddress(order=o)
-
-                if send_to_attendees:
-                    parent_op = None
-                    sent_to_positions = set()
-                    for p in positions:
-                        if p.addon_to_id is None:
-                            # this op might have matching add-ons, so save for later
-                            parent_op = p
-                        elif not parent_op or p.addon_to_id != parent_op.id:
-                            # this op is an add-on, but not to the current parent_op
-                            # something got mixed up as add-ons should always come directly after their parent
-                            logger.warning(f"Add-ons are mixed up for position #{p.positionid} in order {o.full_code}")
-                            continue
-
-                        if p.id not in position_ids:
-                            # not a matching op, just there for parent_op
-                            continue
-
-                        if p.addon_to_id and (
-                            not p.attendee_email or p.attendee_email == parent_op.attendee_email
-                        ):
-                            # if op is addon and either has no mail or the same as parent => send to parent
-                            p = parent_op
-
-                        if p.pk in sent_to_positions:
-                            # this position already got an email
-                            continue
-
-                        if not p.attendee_email or p.attendee_email == o.email:
-                            # no email or same as order => send to order
-                            send_to_order = True
-                            continue
-
-                        email_ctx = get_email_context(
-                            event=e,
-                            order=o,
-                            invoice_address=ia,
-                            position=p,
-                            event_or_subevent=self.subevent or e,
-                        )
-                        p.send_mail(self.rule.subject, self.rule.template, email_ctx,
-                                    attach_ical=self.rule.attach_ical,
-                                    log_entry_type='pretix.plugins.sendmail.rule.order.position.email.sent')
-                        sent_to_positions.add(p.pk)
-
-                if send_to_order and o.email:
-                    email_ctx = get_email_context(
-                        event=e,
-                        order=o,
-                        invoice_address=ia,
-                        event_or_subevent=self.subevent or e,
-                    )
-                    o.send_mail(self.rule.subject, self.rule.template, email_ctx,
-                                attach_ical=self.rule.attach_ical,
-                                log_entry_type='pretix.plugins.sendmail.rule.order.email.sent')
-
-                self.last_successful_order_id = o.pk
+            self._send_to_order(o, position_ids)
+            self.last_successful_order_id = o.pk
 
 
 class Rule(models.Model, LoggingMixin):
@@ -312,6 +442,16 @@ class Rule(models.Model, LoggingMixin):
         default=True,
         verbose_name=_('Enabled'),
         help_text=_('Only enabled rules are actually sent')
+    )
+
+    catch_up_late_orders = models.BooleanField(
+        default=False,
+        verbose_name=_('Catch up late orders'),
+        help_text=_(
+            'If someone orders after the scheduled send time, still send this email at the configured time of day '
+            'on later days, until the day before the event. Orders placed after that last moment receive the email '
+            'immediately.'
+        ),
     )
 
     objects = ScopedManager(organizer='event__organizer')
@@ -464,3 +604,16 @@ class Rule(models.Model, LoggingMixin):
             'count': self.send_offset_days,
             'time': date_format(self.send_offset_time, 'TIME_FORMAT')
         }
+
+
+class RuleOrderSent(models.Model):
+    """Tracks that a scheduled rule email was already sent for an order (and optional subevent)."""
+
+    id = models.BigAutoField(primary_key=True)
+    rule = models.ForeignKey(Rule, on_delete=models.CASCADE, related_name='orders_sent')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='sendmail_rules_sent')
+    subevent = models.ForeignKey(SubEvent, null=True, blank=True, on_delete=models.CASCADE)
+    datetime = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (('rule', 'order', 'subevent'),)
