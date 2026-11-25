@@ -44,6 +44,9 @@ class SettingsSerializer(serializers.Serializer):
         self.changed_data = []
         super().__init__(*args, **kwargs)
         for fname in self.default_fields:
+            if fname not in DEFAULTS:
+                # Skip fields that are not actual settings (e.g. model-only leftovers)
+                continue
             kwargs = DEFAULTS[fname].get('serializer_kwargs', {})
             if callable(kwargs):
                 kwargs = kwargs()

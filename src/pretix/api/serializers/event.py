@@ -772,7 +772,6 @@ class EventSettingsSerializer(SettingsSerializer):
         'event_list_filters',
         'event_calendar_future_only',
         'frontpage_text',
-        'crowd',
         'event_info_text',
         'attendee_names_asked',
         'attendee_names_required',
