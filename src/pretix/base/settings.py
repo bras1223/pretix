@@ -2461,7 +2461,6 @@ DEFAULTS = {
         'type': str,
         'serializer_class': serializers.CharField,
         'serializer_kwargs': dict(allow_blank=True),
-        'write_permission': 'event.settings.mail:write',
     },
     'mail_attach_tickets': {
         'default': 'True',
