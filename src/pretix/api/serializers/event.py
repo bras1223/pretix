@@ -806,6 +806,7 @@ class EventSettingsSerializer(SettingsSerializer):
         'payment_stripe_method_ideal',
         'payment_stripe_method_bancontact',
         'payment_stripe_endpoint',
+        'payment_stripe__fee_abs',
         'mail_days_order_expire_warning',
         'ticket_download',
         'ticket_download_date',

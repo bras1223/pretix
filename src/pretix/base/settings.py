@@ -1190,6 +1190,13 @@ DEFAULTS = {
         'serializer_kwargs': dict(allow_blank=True),
         'write_permission': 'event.settings.payment:write',
     },
+    'payment_stripe__fee_abs': {
+        'default': '0.00',
+        'type': Decimal,
+        'serializer_class': serializers.DecimalField,
+        'serializer_kwargs': dict(max_digits=13, decimal_places=2),
+        'write_permission': 'event.settings.payment:write',
+    },
     'payment_giftcard_public_name': {
         'default': LazyI18nString.from_gettext(gettext_noop('Gift card')),
         'write_permission': 'event.settings.payment:write',
