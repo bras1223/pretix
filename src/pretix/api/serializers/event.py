@@ -817,6 +817,7 @@ class EventSettingsSerializer(SettingsSerializer):
         'ticket_secret_length',
         'mail_prefix',
         'mail_from_name',
+        'mail_html_renderer',
         'mail_attach_ical',
         'mail_attach_tickets',
         'invoice_address_asked',
