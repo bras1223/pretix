@@ -37,7 +37,7 @@
         table.layout > tr > td.logo,
         table.layout > tbody > tr > td.logo,
         table.layout > thead > tr > td.logo {
-            padding: {% if event.settings.logo_image_large %}0 0 0 0{% else %}20px 0 0 0{% endif %};
+            padding: {% if event.settings.logo_image and event.settings.logo_image_large %}0 0 0 0{% elif not event.settings.logo_image and event.settings.organizer_logo_image_inherit and event.settings.organizer_logo_image and event.settings.organizer_logo_image_large %}0 0 0 0{% elif not event and organizer.settings.organizer_logo_image and organizer.settings.organizer_logo_image_large %}0 0 0 0{% else %}20px 0 0 0{% endif %};
             mso-line-height-rule: at-least;
         }
 
@@ -243,6 +243,26 @@
                         <img src="{% if event.settings.logo_image|thumb:'600_x5000'|first == '/' %}{{ site_url }}{% endif %}{{ event.settings.logo_image|thumb:'600_x5000' }}" alt="{{ event.name }}" style="width:100%" />
                     {% else %}
                         <img src="{% if event.settings.logo_image|thumb:'600_x120'|first == '/' %}{{ site_url }}{% endif %}{{ event.settings.logo_image|thumb:'600_x120' }}" alt="{{ event.name }}" style="width:100%" />
+                    {% endif %}
+                </td>
+            </tr>
+        {% elif event and event.settings.organizer_logo_image_inherit and event.settings.organizer_logo_image %}
+            <tr>
+                <td align="center" class="logo">
+                    {% if event.settings.organizer_logo_image_large %}
+                        <img src="{% if event.settings.organizer_logo_image|thumb:'600_x5000'|first == '/' %}{{ site_url }}{% endif %}{{ event.settings.organizer_logo_image|thumb:'600_x5000' }}" alt="{{ event.name }}" style="width:100%" />
+                    {% else %}
+                        <img src="{% if event.settings.organizer_logo_image|thumb:'600_x120'|first == '/' %}{{ site_url }}{% endif %}{{ event.settings.organizer_logo_image|thumb:'600_x120' }}" alt="{{ event.name }}" style="width:100%" />
+                    {% endif %}
+                </td>
+            </tr>
+        {% elif not event and organizer and organizer.settings.organizer_logo_image %}
+            <tr>
+                <td align="center" class="logo">
+                    {% if organizer.settings.organizer_logo_image_large %}
+                        <img src="{% if organizer.settings.organizer_logo_image|thumb:'600_x5000'|first == '/' %}{{ site_url }}{% endif %}{{ organizer.settings.organizer_logo_image|thumb:'600_x5000' }}" alt="{{ organizer.name }}" style="width:100%" />
+                    {% else %}
+                        <img src="{% if organizer.settings.organizer_logo_image|thumb:'600_x120'|first == '/' %}{{ site_url }}{% endif %}{{ organizer.settings.organizer_logo_image|thumb:'600_x120' }}" alt="{{ organizer.name }}" style="width:100%" />
                     {% endif %}
                 </td>
             </tr>
