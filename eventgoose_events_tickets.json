@@ -1,0 +1,1073 @@
+{
+  "generated_from": "https://www.thelovedoctor.nl/api/events",
+  "events": [
+    {
+      "eventgoose_id": "zjDqg2Qm7Lj2QJlr",
+      "title": "Love on the Rooftop",
+      "eventgoose_title": "Love on the Rooftop / SKYBAR / Antwerpen / 40+",
+      "display_title": "Love on the Rooftop",
+      "starts_at": "2026-11-25T18:00:00+00:00",
+      "ends_at": "2026-11-25T21:00:00+00:00",
+      "city": "Antwerpen",
+      "venue": "SKYBAR",
+      "country": "Belgium",
+      "address_text": "Sint-Pietersvliet 7, 2000 Antwerpen, Belgium",
+      "age_group": "40+",
+      "dress_code": "Cocktail chic",
+      "edition": "Singles Mixer",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ",
+        "Rooftop setting"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/zjDqg2Qm7Lj2QJlr/banner-15215316381794390310.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/zjDqg2Qm7Lj2QJlr",
+      "tickets": [
+        {
+          "id": "ZgvLVEzk7nOWq9DP",
+          "name": "Love On The Rooftop SKYBAR Antwerp 40+ 1 ticket",
+          "price": 29.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 30.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "xmbkd238dGMLl8Yr",
+          "name": "Love On The Rooftop SKYBAR Antwerp 40+ 2 tickets",
+          "price": 54.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 55.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "mvbeBMkrbep2yP4g",
+      "title": "Love on the Rooftop",
+      "eventgoose_title": "Love on the Rooftop / SKYBAR / Antwerpen / 21-45",
+      "display_title": "Love on the Rooftop",
+      "starts_at": "2026-11-25T18:00:00+00:00",
+      "ends_at": "2026-11-25T21:00:00+00:00",
+      "city": "Antwerpen",
+      "venue": "SKYBAR",
+      "country": "Belgium",
+      "address_text": "Sint-Pietersvliet 7, 2000 Antwerpen, Belgium",
+      "age_group": "21-45",
+      "dress_code": "Cocktail chic",
+      "edition": "Singles Mixer",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ",
+        "Rooftop setting"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/mvbeBMkrbep2yP4g/banner-2602091801794390327.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/mvbeBMkrbep2yP4g",
+      "tickets": [
+        {
+          "id": "dP8kGOmJZV2wgmlr",
+          "name": "Love On The Rooftop Antwerpen 1 ticket",
+          "price": 29.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 30.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "Lenyp2qwJkERAQVY",
+          "name": "Love On The Rooftop Antwerpen 2 tickets",
+          "price": 54.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 55.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "6YaldE9laLXMG3LB",
+      "title": "Meet Me At The Hub",
+      "eventgoose_title": "Meet Me At The Hub / The Social Hub / Maastricht / 21-45",
+      "display_title": "Meet Me At The Hub",
+      "starts_at": "2026-11-26T18:00:00+00:00",
+      "ends_at": "2026-11-26T21:00:00+00:00",
+      "city": "Maastricht",
+      "venue": "The Social Hub",
+      "country": "Netherlands",
+      "address_text": "Sphinxcour 9A, 6211 XZ Maastricht, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "",
+      "edition": "Singles Mixer",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/6YaldE9laLXMG3LB/banner-6164083801791973099.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/6YaldE9laLXMG3LB",
+      "tickets": [
+        {
+          "id": "kQJgAM7r9W2B1Lv4",
+          "name": "Meet Me At The Hub Maastricht 1 ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "q5dZlOp9DP2zrJWe",
+          "name": "Meet Me At The Hub Maastricht 2 tickets",
+          "price": 44.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 45.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "mjpk1EgrZRPM6APR",
+      "title": "Darts & Dating",
+      "eventgoose_title": "Darts & Dating / Tripleclub / Utrecht / 40+",
+      "display_title": "Darts & Dating",
+      "starts_at": "2026-11-27T18:00:00+00:00",
+      "ends_at": "2026-11-27T21:00:00+00:00",
+      "city": "Utrecht",
+      "venue": "Tripleclub",
+      "country": "Netherlands",
+      "address_text": "Lange Viestraat 1, 3511 BK Utrecht, Netherlands",
+      "age_group": "40+",
+      "dress_code": "",
+      "edition": "Singles Mixer",
+      "extras": [
+        "Darts",
+        "The Love Doctor Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/mjpk1EgrZRPM6APR/banner-523969971793960392.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/mjpk1EgrZRPM6APR",
+      "tickets": [
+        {
+          "id": "qQXr3MYR6kEAD7V6",
+          "name": "Darts & Dating Singles Borrel Utrecht 1 ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "pARn32G9lNEgeoWZ",
+          "name": "Darts & Dating Singles Borrel Utrecht 2 tickets",
+          "price": 44.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 45.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "WVmRd20kxw0O5LAv",
+      "title": "Cheers To Love X-mas",
+      "eventgoose_title": "Cheers To Love X-mas / Stadsbrouwerij / Eindhoven / 40+",
+      "display_title": "Cheers To Love X-mas",
+      "starts_at": "2026-12-04T17:00:00+00:00",
+      "ends_at": "2026-12-04T20:00:00+00:00",
+      "city": "Eindhoven",
+      "venue": "Stadsbrouwerij",
+      "country": "Netherlands",
+      "address_text": "",
+      "age_group": "40+",
+      "dress_code": "",
+      "edition": "Christmas",
+      "extras": [],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/WVmRd20kxw0O5LAv/banner-13036292121793630322.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/WVmRd20kxw0O5LAv",
+      "tickets": [
+        {
+          "id": "q5dZlOp9ne2zrJWe",
+          "name": "Cheers To Love Eindhoven KERST EDITIE 1 ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "Qaj9N2LxgK285WKn",
+          "name": "Cheers To Love Eindhoven KERST EDITIE 2 tickets",
+          "price": 44.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 45.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "mvbeBMkrbnA2yP4g",
+      "title": "The Singles Night Live",
+      "eventgoose_title": "The Singles Night Live / Café Lievense / Breda / 40+",
+      "display_title": "The Singles Night Live",
+      "starts_at": "2026-12-04T18:00:00+00:00",
+      "ends_at": "2026-12-04T21:00:00+00:00",
+      "city": "Breda",
+      "venue": "Café Lievense",
+      "country": "Netherlands",
+      "address_text": "Prinsenkade 7, 4811 VB Breda, Netherlands",
+      "age_group": "40+",
+      "dress_code": "",
+      "edition": "Singles Mixer",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live band"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/mvbeBMkrbnA2yP4g/banner-18158551551793471028.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/mvbeBMkrbnA2yP4g",
+      "tickets": [
+        {
+          "id": "pverxOyK1QM4ndwm",
+          "name": "Café Lievense Breda 1 ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "A4njmMB5pN2p0l36",
+          "name": "Café Lievense Breda 2 tickets",
+          "price": 44.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 45.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "wWeoQEbRgGGE1ldb",
+      "title": "Shuffle Into Love",
+      "eventgoose_title": "Shuffle Into Love / The Grand Shuffle / Utrecht / 21-45",
+      "display_title": "Shuffle Into Love",
+      "starts_at": "2026-12-04T19:00:00+00:00",
+      "ends_at": "2026-12-04T22:00:00+00:00",
+      "city": "Utrecht",
+      "venue": "The Grand Shuffle",
+      "country": "Netherlands",
+      "address_text": "Rijnkade 5, 3511 LC Utrecht, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "",
+      "edition": "Singles Mixer",
+      "extras": [
+        "Shuffleboard",
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/wWeoQEbRgGGE1ldb/banner-2749753841793628048.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/wWeoQEbRgGGE1ldb",
+      "tickets": [
+        {
+          "id": "jByJwEnPnd2mqZXN",
+          "name": "Shuffle Into Love Utrecht single ticket",
+          "price": 26.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 27.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "6YaldE91wJEG3LBW",
+          "name": "Shuffle Into Love multiple tickets",
+          "price": 24.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "nqZebOXKAXnEzoyW",
+      "title": "Love Is Brewing X-mas",
+      "eventgoose_title": "Love Is Brewing X-mas / Stadsbrouwerij / Eindhoven / 21-45",
+      "display_title": "Love Is Brewing X-mas",
+      "starts_at": "2026-12-04T20:00:00+00:00",
+      "ends_at": "2026-12-04T23:00:00+00:00",
+      "city": "Eindhoven",
+      "venue": "Stadsbrouwerij",
+      "country": "Netherlands",
+      "address_text": "Bleekweg 1, 5611 EZ Eindhoven, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "The Love Doctor Match App",
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/nqZebOXKAXnEzoyW/banner-3628135481793630247.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/nqZebOXKAXnEzoyW",
+      "tickets": [
+        {
+          "id": "8nvPJON63YOYGR0Q",
+          "name": "Love Is Brewing Eindhoven single ticket",
+          "price": 26.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 27.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "kQJgAM7rw72B1Lv4",
+          "name": "Love Is Brewing Eindhoven multiple tickets",
+          "price": 24.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "5KgQw2vZvnN2PlAZ",
+      "title": "Strøming Into Love X-mas",
+      "eventgoose_title": "Strøming Into Love X-mas / Strøming / Tilburg / 21-45",
+      "display_title": "Strøming Into Love X-mas",
+      "starts_at": "2026-12-10T18:00:00+00:00",
+      "ends_at": "2026-12-10T21:00:00+00:00",
+      "city": "Tilburg",
+      "venue": "Strøming",
+      "country": "Netherlands",
+      "address_text": "Spoorlaan 21D, 5038 CB Tilburg, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "The Love Doctor Match App"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/5KgQw2vZvnN2PlAZ/banner-12074879431793633110.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/5KgQw2vZvnN2PlAZ",
+      "tickets": [
+        {
+          "id": "ykpm0OWZeaEQ5qdx",
+          "name": "Strøming Into Love Tilburg single ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "NZGx32KLk5MJqQmB",
+          "name": "Strøming Into Love Tilburg multiple tickets",
+          "price": 22.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 23.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "mjpk1EgrZ4bM6APR",
+      "title": "Strøming Into Love X-mas",
+      "eventgoose_title": "Strøming Into Love X-mas / Strøming / Tilburg / 40+",
+      "display_title": "Strøming Into Love X-mas",
+      "starts_at": "2026-12-10T18:00:00+00:00",
+      "ends_at": "2026-12-10T21:00:00+00:00",
+      "city": "Tilburg",
+      "venue": "Strøming",
+      "country": "Netherlands",
+      "address_text": "Spoorlaan 21D, 5038 CB Tilburg, Netherlands",
+      "age_group": "40+",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/mjpk1EgrZ4bM6APR/banner-15244104821793804910.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/mjpk1EgrZ4bM6APR",
+      "tickets": [
+        {
+          "id": "KN43GOrdWlMXJQbx",
+          "name": "Strøming Into Love Tilburg single ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "5KgQw2vVzQ2PlAZJ",
+          "name": "Strøming Into Love Tilburg multiple tickets",
+          "price": 22.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 23.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "pARn32GY5B7EgeoW",
+      "title": "Singles Night X-mas",
+      "eventgoose_title": "Singles Night X-mas / Café Le Journal / Roermond / 21-45",
+      "display_title": "Singles Night X-mas",
+      "starts_at": "2026-12-11T18:00:00+00:00",
+      "ends_at": "2026-12-11T21:00:00+00:00",
+      "city": "Roermond",
+      "venue": "Café Le Journal",
+      "country": "Netherlands",
+      "address_text": "Stationsplein 17A, 6041 GN Roermond, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/pARn32GY5B7EgeoW/banner-1964980641793978992.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/pARn32GY5B7EgeoW",
+      "tickets": [
+        {
+          "id": "kQJgAM7rmd2B1Lv4",
+          "name": "Singles Night Roermond single ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "q5dZlOp9QB2zrJWe",
+          "name": "Singles Night Roermond multiple tickets",
+          "price": 22.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 23.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "L3DYVM4rKjaOBJn4",
+      "title": "TEDS Bakery Rave",
+      "eventgoose_title": "TEDS Bakery Rave / Teds Bakery Strijp-S / Eindhoven / 21-45",
+      "display_title": "TEDS Bakery Rave",
+      "starts_at": "2026-12-12T08:00:00+00:00",
+      "ends_at": "2026-12-12T11:00:00+00:00",
+      "city": "Eindhoven",
+      "venue": "Teds Bakery Strijp-S",
+      "country": "Netherlands",
+      "address_text": "Leidingstraat 45, 5617 AJ Eindhoven, Nederland",
+      "age_group": "21-45",
+      "dress_code": "Come as you are",
+      "edition": "Bakery Rave",
+      "extras": [
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/L3DYVM4rKjaOBJn4/banner-13029563021794577382.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/L3DYVM4rKjaOBJn4",
+      "tickets": [
+        {
+          "id": "8qX7ZMxWWG2g5DQj",
+          "name": "TEDS Bakery Rave single ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "1dkQJ2VQQAOrpZBV",
+          "name": "TEDS Bakery Rave multiple ticket",
+          "price": 22.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 23.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "nqJjGEj7onBOedYP",
+      "title": "The Love Voyage X-mas",
+      "eventgoose_title": "The Love Voyage X-mas / SOAN / Gent / 20-35",
+      "display_title": "The Love Voyage X-mas",
+      "starts_at": "2026-12-15T18:00:00+00:00",
+      "ends_at": "2026-12-15T21:00:00+00:00",
+      "city": "Gent",
+      "venue": "SOAN",
+      "country": "Belgium",
+      "address_text": "Korenlei 10, 9000 Ghent, Belgium",
+      "age_group": "20-35",
+      "dress_code": "Come as you are, with a little festive sparkle if you like!",
+      "edition": "Christmas",
+      "extras": [
+        "Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/nqJjGEj7onBOedYP/banner-2666914351794583723.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/nqJjGEj7onBOedYP",
+      "tickets": [
+        {
+          "id": "xmbkd238wjMLl8Yr",
+          "name": "The Love Voyage Gent single ticket",
+          "price": 29.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 30.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "yvDnoOavYJ2R6p9J",
+          "name": "The Love Voyage Gent multiple tickets",
+          "price": 27.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 28.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "G6Bkm2l98ezMdKjz",
+      "title": "Love in Ghent X-mas",
+      "eventgoose_title": "Love in Ghent X-mas / De Maecht van Ghent / Gent / 30-45",
+      "display_title": "Love in Ghent X-mas",
+      "starts_at": "2026-12-15T18:00:00+00:00",
+      "ends_at": "2026-12-15T21:00:00+00:00",
+      "city": "Gent",
+      "venue": "De Maecht van Ghent",
+      "country": "Belgium",
+      "address_text": "Korenmarkt 5, 9000 Gent, België",
+      "age_group": "30-45",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/G6Bkm2l98ezMdKjz/banner-2783434571794581066.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/G6Bkm2l98ezMdKjz",
+      "tickets": [
+        {
+          "id": "NZGx32KLX5MJqQmB",
+          "name": "Love In Gent De Maecht single ticket",
+          "price": 29.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 30.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "mvbeBMk58AOyP4gA",
+          "name": "Love In Gent De Maecht multiple tickets",
+          "price": 27.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 28.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "nqZebOXKAJ8EzoyW",
+      "title": "Love Above Hasselt X-mas",
+      "eventgoose_title": "Love Above Hasselt X-mas / Bonair / Hasselt / 21-45",
+      "display_title": "Love Above Hasselt X-mas",
+      "starts_at": "2026-12-16T18:00:00+00:00",
+      "ends_at": "2026-12-16T21:00:00+00:00",
+      "city": "Hasselt",
+      "venue": "Bonair",
+      "country": "Belgium",
+      "address_text": "Torenplein 8, 3500 Hasselt, Belgium",
+      "age_group": "21-45",
+      "dress_code": "Come as you are, with a little festive sparkle if you like!",
+      "edition": "Christmas",
+      "extras": [
+        "Match App",
+        "Coloured wristbands",
+        "Rooftop Bar – Panoramic City Views"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/nqZebOXKAJ8EzoyW/banner-11387852431794923305.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/nqZebOXKAJ8EzoyW",
+      "tickets": [
+        {
+          "id": "yvDnoOaDWrER6p9J",
+          "name": "Love Above Hasselt single ticket",
+          "price": 29.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 30.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "q5dZlOpl6kOzrJWe",
+          "name": "Love Above Hasselt multiple tickets",
+          "price": 27.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 28.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "pARn32GY5oNEgeoW",
+      "title": "Darts & Dating X-mas",
+      "eventgoose_title": "Darts & Dating X-mas / Tripleclub / Utrecht / 40+",
+      "display_title": "Darts & Dating X-mas",
+      "starts_at": "2026-12-17T18:00:00+00:00",
+      "ends_at": "2026-12-17T21:00:00+00:00",
+      "city": "Utrecht",
+      "venue": "Tripleclub",
+      "country": "Netherlands",
+      "address_text": "Lange Viestraat 1, 3511 BK Utrecht, Netherlands",
+      "age_group": "40+",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "Darts",
+        "The Love Doctor Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/pARn32GY5oNEgeoW/banner-5449942911793961364.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/pARn32GY5oNEgeoW",
+      "tickets": [
+        {
+          "id": "KN43GOrdnvMXJQbx",
+          "name": "Darts & Dating Singles Borrel Utrecht 1 ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "5KgQw2vVnN2PlAZJ",
+          "name": "Darts & Dating Singles Borrel Utrecht 2 tickets",
+          "price": 44.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 45.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "xmbkd233WPN2Ll8Y",
+      "title": "Singles Night X-mas",
+      "eventgoose_title": "Singles Night X-mas / Café Le Journal / Roermond / 40+",
+      "display_title": "Singles Night X-mas",
+      "starts_at": "2026-12-17T18:00:00+00:00",
+      "ends_at": "2026-12-17T21:00:00+00:00",
+      "city": "Roermond",
+      "venue": "Café Le Journal",
+      "country": "Netherlands",
+      "address_text": "Stationsplein 17A, 6041 GN Roermond, Netherlands",
+      "age_group": "40+",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/xmbkd233WPN2Ll8Y/banner-11335569731794917312.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/xmbkd233WPN2Ll8Y",
+      "tickets": [
+        {
+          "id": "Lenyp2qpkeORAQVY",
+          "name": "Singles Night Roermond 1 ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "qQXr3MY8md2AD7V6",
+          "name": "Singles Night Roermond 2 tickets",
+          "price": 44.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 45.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "Lenyp2qWv1kERAQV",
+      "title": "The Match Games X-mas",
+      "eventgoose_title": "The Match Games X-mas / Mooie Boules / Delft / 21-45",
+      "display_title": "The Match Games X-mas",
+      "starts_at": "2026-12-18T18:00:00+00:00",
+      "ends_at": "2026-12-18T21:00:00+00:00",
+      "city": "Delft",
+      "venue": "Mooie Boules",
+      "country": "Netherlands",
+      "address_text": "Professor Schermerhornstraat 9, 2628 PZ Delft, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "Come as you are",
+      "edition": "Christmas",
+      "extras": [
+        "Jeu de boules",
+        "The Love Doctor Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/Lenyp2qWv1kERAQV/banner-19148573571793637450.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/Lenyp2qWv1kERAQV",
+      "tickets": [
+        {
+          "id": "5r6PGEonwyMLvKwm",
+          "name": "The Match Games Delft single ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "wWeoQEb7GGO1ldbP",
+          "name": "The Match Games Delft multiple tickets",
+          "price": 22.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 23.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "jdynvMDbNpwOxQKV",
+      "title": "Love On Vrijthof X-mas",
+      "eventgoose_title": "Love On Vrijthof X-mas / MOMUS / Maastricht / 40+",
+      "display_title": "Love On Vrijthof X-mas",
+      "starts_at": "2026-12-18T18:00:00+00:00",
+      "ends_at": "2026-12-18T21:00:00+00:00",
+      "city": "Maastricht",
+      "venue": "MOMUS",
+      "country": "Netherlands",
+      "address_text": "Vrijthof 8, 6211 LC Maastricht, Netherlands",
+      "age_group": "40+",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "Live DJ",
+        "The Love Doctor Match App"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/jdynvMDbNpwOxQKV/banner-21041585461793636478.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/jdynvMDbNpwOxQKV",
+      "tickets": [
+        {
+          "id": "zjDqg2QkZjEQJlrv",
+          "name": "Love On Vrijthof Maastricht 1 ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "pagA8EZor8Orlwn1",
+          "name": "Love On Vrijthof Maastricht 2 tickets",
+          "price": 44.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 45.99,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "dP8kGOm4enVEwgml",
+      "title": "Brewing Romance X-mas",
+      "eventgoose_title": "Brewing Romance X-mas / Brewsters / Maastricht / 21-45",
+      "display_title": "Brewing Romance X-mas",
+      "starts_at": "2026-12-18T18:37:00+00:00",
+      "ends_at": "2026-12-18T21:37:00+00:00",
+      "city": "Maastricht",
+      "venue": "Brewsters",
+      "country": "Netherlands",
+      "address_text": "Kesselskade 47, 6211 EN Maastricht, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/dP8kGOm4enVEwgml/banner-9204919441793803277.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/dP8kGOm4enVEwgml",
+      "tickets": [
+        {
+          "id": "L3DYVM4ewREBJn4w",
+          "name": "Brewing Romance Maastricht single ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "Nk7n02Rg4oMad3Lx",
+          "name": "Brewing Romance Maastricht multiple tickets",
+          "price": 22.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 23.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "qQXr3MYk5pkOAD7V",
+      "title": "The Match Games X-mas",
+      "eventgoose_title": "The Match Games X-mas / Mooie Boules / Eindhoven / 21-45",
+      "display_title": "The Match Games X-mas",
+      "starts_at": "2026-12-19T19:00:00+00:00",
+      "ends_at": "2026-12-19T22:00:00+00:00",
+      "city": "Eindhoven",
+      "venue": "Mooie Boules",
+      "country": "Netherlands",
+      "address_text": "Kleine Berg 12, 5611 JV Eindhoven, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "",
+      "edition": "Christmas",
+      "extras": [
+        "Jeu de boules",
+        "The Love Doctor Match App"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/qQXr3MYk5pkOAD7V/banner-6618789051793693592.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/qQXr3MYk5pkOAD7V",
+      "tickets": [
+        {
+          "id": "nqZebOX4XnOzoyWG",
+          "name": "The Matches Games CHRISTMAS Eindhoven single ticket",
+          "price": 24.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "WVmRd20Rw0E5LAvB",
+          "name": "The Matches Games CHRISTMAS multiple tickets",
+          "price": 22.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 23.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "Nk7n02R057yEad3L",
+      "title": "Love on the Rooftop X-mas",
+      "eventgoose_title": "Love on the Rooftop X-mas / SKYBAR / Antwerpen / 20-35",
+      "display_title": "Love on the Rooftop X-mas",
+      "starts_at": "2026-12-16T18:00:00+00:00",
+      "ends_at": "2026-12-16T21:00:00+00:00",
+      "city": "Antwerpen",
+      "venue": "SKYBAR",
+      "country": "Belgium",
+      "address_text": "Sint-Pietersvliet 7, 2000 Antwerpen, Belgium",
+      "age_group": "20-35",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/Nk7n02R057yEad3L/banner-12107030341795516063.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/Nk7n02R057yEad3L",
+      "tickets": [
+        {
+          "id": "L3DYVM4vaDOBJn4w",
+          "name": "Love On The Rooftop Antwerpen single ticket",
+          "price": 29.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 30.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "Nk7n02RaWVOad3Lx",
+          "name": "Love On The Rooftop Antwerpen multiple tickets",
+          "price": 27.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 28.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "wWeoQEbRga3E1ldb",
+      "title": "Love on the Rooftop X-mas",
+      "eventgoose_title": "Love on the Rooftop X-mas / SKYBAR / Antwerpen / 30-45",
+      "display_title": "Love on the Rooftop X-mas",
+      "starts_at": "2026-12-16T18:00:00+00:00",
+      "ends_at": "2026-12-16T21:00:00+00:00",
+      "city": "Antwerpen",
+      "venue": "SKYBAR",
+      "country": "Belgium",
+      "address_text": "Sint-Pietersvliet 7, 2000 Antwerpen, Belgium",
+      "age_group": "30-45",
+      "dress_code": "Christmas glam",
+      "edition": "Christmas",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/wWeoQEbRga3E1ldb/banner-17712942991795518013.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/wWeoQEbRga3E1ldb",
+      "tickets": [
+        {
+          "id": "wWeoQEbm0YM1ldbP",
+          "name": "Love On The Rooftop Antwerpen single ticket",
+          "price": 29.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 30.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "by03NM8maaEAD4R1",
+          "name": "Love On The Rooftop Antwerpen multiple tickets",
+          "price": 27.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 28.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "by03NM8P3z6MAD4R",
+      "title": "Single Mingle Music Night",
+      "eventgoose_title": "Single Mingle Music Night / POPEI / Eindhoven / 21-45",
+      "display_title": "Single Mingle Music Night",
+      "starts_at": "2027-01-08T20:00:00+00:00",
+      "ends_at": "2027-01-08T23:00:00+00:00",
+      "city": "Eindhoven",
+      "venue": "POPEI",
+      "country": "Netherlands",
+      "address_text": "Klokgebouw 300, 5617 AC Eindhoven, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "",
+      "edition": "Singles Mixer",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/by03NM8P3z6MAD4R/banner-16728358871795520524.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/by03NM8P3z6MAD4R",
+      "tickets": [
+        {
+          "id": "q8bgDOe7BoMk0ZGd",
+          "name": "Single Mingle Music Night single ticket",
+          "price": 26.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 27.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "nqZebOXbNDMzoyWG",
+          "name": "Single Mingle Music Night multiple tickets",
+          "price": 24.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "KN43GOrz9myOXJQb",
+      "title": "Love On Vrijthof New Year",
+      "eventgoose_title": "Love On Vrijthof New Year / MOMUS / Maastricht / 40+",
+      "display_title": "Love On Vrijthof New Year",
+      "starts_at": "2027-01-15T18:00:00+00:00",
+      "ends_at": "2027-01-15T21:00:00+00:00",
+      "city": "Maastricht",
+      "venue": "MOMUS",
+      "country": "Netherlands",
+      "address_text": "Vrijthof 8, 6211 LC Maastricht, Netherlands",
+      "age_group": "40+",
+      "dress_code": "",
+      "edition": "New Year",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/KN43GOrz9myOXJQb/banner-20889624281795527447.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/KN43GOrz9myOXJQb",
+      "tickets": [
+        {
+          "id": "nqJjGEjJ0NEedYPQ",
+          "name": "Love On Vrijthof Maastricht single ticket",
+          "price": 25.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 26.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "jdynvMDwGa2xQKV9",
+          "name": "Love On Vrijthof Maastricht multiple tickets",
+          "price": 23.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 24.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "WVmRd20kxLWO5LAv",
+      "title": "The Singles Night Live / / Lievense / Breda /",
+      "eventgoose_title": "The Singles Night Live / 15-01 / Café Lievense / Breda / 40+",
+      "display_title": null,
+      "starts_at": "2027-01-15T19:00:00+00:00",
+      "ends_at": "2027-01-15T22:00:00+00:00",
+      "city": "Breda",
+      "venue": "Café Lievense 🍺",
+      "country": "Netherlands",
+      "address_text": "Prinsenkade 7, 4811 VB Breda, Netherlands",
+      "age_group": "40+",
+      "dress_code": "",
+      "edition": "Singles Mixer",
+      "extras": [
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live band"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/WVmRd20kxLWO5LAv/banner-1592632911795525740.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/WVmRd20kxLWO5LAv",
+      "tickets": [
+        {
+          "id": "5KgQw2vWLjMPlAZJ",
+          "name": "The Singles Night Live single ticket",
+          "price": 26.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 27.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "Q4aZe21X9DOrlkY6",
+          "name": "The Singles Night Live multiple tickets",
+          "price": 24.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.49,
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "eventgoose_id": "nqJjGEj7oenOedYP",
+      "title": "Shuffle Into Love / / Grand Shuffle / Utrecht /",
+      "eventgoose_title": "Shuffle Into Love / 15-01 / Grand Shuffle / Utrecht / 21-45",
+      "display_title": null,
+      "starts_at": "2027-01-15T19:00:00+00:00",
+      "ends_at": "2027-01-15T22:00:00+00:00",
+      "city": "Utrecht",
+      "venue": "The Grand Shuffle",
+      "country": "Netherlands",
+      "address_text": "Rijnkade 5, 3511 LC Utrecht, Netherlands",
+      "age_group": "21-45",
+      "dress_code": "",
+      "edition": "Singles Mixer",
+      "extras": [
+        "Shuffleboard",
+        "The Love Doctor Match App",
+        "Coloured wristbands",
+        "Live DJ"
+      ],
+      "image_url": "https://yyfanmbgnpiawhmixptp.supabase.co/storage/v1/object/public/tld-event-banners/events/nqJjGEj7oenOedYP/banner-14573060071795528369.png",
+      "ticket_url": "https://thelovedoctorevents.eventgoose.com/events/nqJjGEj7oenOedYP",
+      "tickets": [
+        {
+          "id": "pARn32GpG5MgeoWZ",
+          "name": "Shuffle Into Love Utrecht 1 ticket",
+          "price": 26.99,
+          "service_fee": 1.0,
+          "price_incl_fee": 27.99,
+          "currency": "EUR"
+        },
+        {
+          "id": "pverxOyg6qM4ndwm",
+          "name": "Shuffle Into Love Utrecht multiple tickets",
+          "price": 24.49,
+          "service_fee": 1.0,
+          "price_incl_fee": 25.49,
+          "currency": "EUR"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}
